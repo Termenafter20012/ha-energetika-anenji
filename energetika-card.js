@@ -1,11 +1,11 @@
-import './energetika-history.js?v=2.1';
+import './energetika-history.js?v=2.2.2';
 
 export function formatRuntime(minutes) {
   if (!Number.isFinite(minutes) || minutes < 0) return '—';
   const total=Math.floor(minutes);
   return total===0?'0 мин':`${Math.floor(total/60)} ч ${String(total%60).padStart(2,'0')} мин`;
 }
-/* Energetika 2.1 — local Home Assistant card, no external dependencies. */
+/* Energetika 2.2 — local Home Assistant card, no external dependencies. */
 const ROOT = 'sensor.anenji_4200_protocol_1_';
 const ENTITIES = {
   grid_voltage: ROOT + 'grid_voltage', grid_current: 'sensor.energetika_grid_current_estimate',
@@ -14,7 +14,8 @@ const ENTITIES = {
   runtime: 'sensor.energetika_battery_runtime_to_reserve',
   grid: ROOT + 'grid_power', solar: ROOT + 'pv_power', load: ROOT + 'load_power',
   battery: 'sensor.energetika_battery_remaining', percent: 'sensor.energetika_battery_percent_energy',
-  voltage: ROOT + 'battery_voltage', inverter_percent: ROOT + 'battery_percent',
+  voltage: ROOT + 'battery_voltage', voltage_min: ROOT + 'battery_under_voltage_off_grid',
+  percent_voltage: 'sensor.energetika_battery_percent_voltage', inverter_percent: ROOT + 'battery_percent',
   inverter_energy: 'sensor.energetika_battery_remaining_inverter',
   pv_battery: ROOT + 'pv_to_battery_power', pv_load: ROOT + 'pv_to_home_power',
   grid_battery: ROOT + 'grid_to_battery_power', grid_load: ROOT + 'grid_to_home_power',
@@ -39,6 +40,8 @@ class EnergetikaCard extends HTMLElement {
     super();
     this.attachShadow({mode: 'open'});
     this._entities = ENTITIES;
+    this._batteryMode = 'energy';
+    try { this._batteryMode = localStorage.getItem('energetika.battery-mode') === 'voltage' ? 'voltage' : 'energy'; } catch {}
   }
   setConfig(config) {
     this.config = {...config};
@@ -78,8 +81,11 @@ class EnergetikaCard extends HTMLElement {
       .charge-tile>.tile{width:100%;height:100%}.flow[data-flow=battery_load] .flow-label text{font-size:16px}
       .node-metrics{font-size:11px;fill:#9bb2c7;font-variant-numeric:tabular-nums}.node-runtime{font-size:10px;fill:#60d6b7;font-variant-numeric:tabular-nums}.node-metrics [role=button]:hover{fill:white}.runtime{display:block;border:0;background:transparent;color:#67cbb3;font-size:10px;padding:7px 0 0;text-align:left;font-variant-numeric:tabular-nums}.runtime:hover{text-decoration:underline}.battery-main{flex-wrap:wrap}.runtime{grid-column:1;grid-row:3}.battery-summary .bar{grid-row:4}.battery-summary .mini-row{grid-row:2/5}.battery-summary .battery-extra{grid-row:5}
       @keyframes current{to{stroke-dashoffset:-42}}@media(prefers-reduced-motion:reduce){.flow.active .moving{animation:none}.tile,.bar span{transition:none}}
-      @media(max-width:750px){.shell{padding:18px 13px;border-radius:22px;margin:4px auto 12px}.tiles{gap:8px}.tile{padding:12px 9px;gap:7px;min-height:95px}.tile .icon{width:26px;height:30px}.tile-title{font-size:11px}.tile strong{font-size:21px}.tile small{font-size:9px}.arrow{display:none}.battery-summary{padding:12px}.battery-title{font-size:11px}.mini strong{font-size:13px}.battery-main{flex-wrap:wrap;gap:2px}.capacity{font-size:9px}header{padding:0 3px 4px}h1{font-size:23px}.sub{font-size:11px}}
-      @media(max-width:520px){.shell{padding:17px 10px}.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.tile{padding:14px 11px;min-height:96px}.tile strong{font-size:24px}.tile .icon{width:29px;height:33px}.tile-title{font-size:11px}.battery-summary{grid-column:span 2;grid-row:5;display:grid;grid-template-columns:1fr 1fr;column-gap:18px;padding:15px}.battery-title{grid-column:1/-1;margin-bottom:7px}.battery-main{grid-column:1;align-content:start}.battery-main .plain-value strong{font-size:28px}.bar{grid-column:1;grid-row:3;margin:9px 0}.mini-row{grid-column:2;grid-row:2/4;align-items:start;gap:9px}.mini strong{font-size:17px}.mini>span{font-size:9px}.battery-extra{grid-column:1/-1;margin-top:5px}.charge-tile{grid-column:span 1}.note{font-size:10px}.live{font-size:10px;padding:6px 9px}.eyebrow{font-size:9px}.last-full{display:block;margin:9px 0 0}.diagram{margin-top:6px}.section-label{margin-top:0;font-size:9px}}
+      .shell{display:block}.battery-summary{grid-column:1/-1;grid-row:4;padding:14px 17px}.battery-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}.battery-title{margin:0;white-space:nowrap}.nameplate{color:#72999f;font-size:10px;margin-left:5px}.mode-switch{display:flex;border:1px solid #23534f;border-radius:8px;padding:2px;gap:2px}.mode-switch button{border:0;border-radius:5px;background:none;color:#7b9caa;padding:4px 9px;font-size:10px;white-space:nowrap}.mode-switch button[aria-pressed=true]{background:#123e38;color:#66edd0}.battery-layout{display:grid;grid-template-columns:1.4fr .8fr .8fr;gap:12px;align-items:center}.battery-main{display:block}.battery-main .plain-value strong{font-size:30px}.battery-main .capacity{display:block;font-size:10px;margin-top:2px}.battery-layout .mini strong{font-size:20px}.battery-layout .mini>span{font-size:10px}.voltage-limits{display:flex;align-items:center;gap:9px;margin-top:10px;font-size:10px;white-space:nowrap}.voltage-limits button{border:0;padding:0;background:none;font:inherit}.voltage-min{color:#ff8689}.voltage-max{color:#56e5ad}.voltage-limits .bar{flex:1;margin:0;height:5px}.battery-bottom{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;font-size:10px;color:#71929f}.battery-bottom .runtime{padding:0;font-size:10px}.battery-spec{white-space:nowrap}.battery-extra{display:none}.calibration{margin-top:8px;padding:6px 9px;font-size:10px}.note{margin:10px 0}.section-label span{display:none}details{margin-top:10px;padding-top:8px}footer{margin-top:8px}.tile small{display:none}.tile{min-height:85px}.mode-note{color:#b4bc8a}.main-status{font-size:9px;color:#b4bc8a;margin-left:auto}.charge-tile{grid-column:auto;grid-row:3}.battery-layout .secondary-energy{display:none}
+      @media(max-width:750px){.shell{padding:15px 12px;border-radius:22px;margin:3px auto 10px}.tiles{gap:7px}.tile{padding:10px;gap:7px;min-height:73px}.tile .icon{width:23px;height:27px}.tile-title{font-size:10px}.tile strong{font-size:22px}.arrow{display:none}header{padding:0 2px 3px}h1{font-size:23px;margin:0}.sub{display:none}.eyebrow{font-size:8px;margin-bottom:4px}.live{font-size:9px;padding:6px 8px}.battery-title{font-size:11px}.nameplate{font-size:9px}.battery-summary{padding:12px}.battery-main .plain-value strong{font-size:28px}.battery-layout .mini strong{font-size:19px}}
+      @media(max-width:520px){.shell{padding:11px 9px 8px;border-radius:19px}.tiles{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.tile{position:relative;padding:7px 6px;min-height:59px;border-radius:12px;display:block}.tile>.icon{position:absolute;width:18px;height:21px;left:7px;bottom:9px}.tile-body{gap:6px}.tile-title{font-size:9px;line-height:1.2;white-space:nowrap;color:#adc4d3}.tile-body strong{font-size:20px;padding-left:22px;line-height:1.1}.tile-body strong.long-value{font-size:16px}.unit{margin-left:2px}.diagram{margin:0 auto;width:100%;max-height:255px}.section-label{font-size:8px;margin:1px 2px 6px;letter-spacing:1.3px}h1{font-size:21px}.eyebrow{font-size:7px;letter-spacing:1.5px}.live{font-size:9px}.battery-summary{display:block;grid-column:1/-1;grid-row:4;padding:9px 10px;border-radius:13px;min-height:0}.battery-top{margin-bottom:6px;gap:4px}.battery-title{font-size:11px;gap:4px}.battery-title .icon{width:15px;height:19px}.nameplate{font-size:8px;margin-left:2px}.mode-switch button{font-size:9px;padding:4px 6px}.battery-layout{grid-template-columns:1.35fr .75fr .8fr;gap:8px}.battery-main .plain-value strong{font-size:26px}.battery-main .capacity{font-size:8px;margin-top:1px}.battery-layout .mini>span{font-size:8px}.battery-layout .mini strong{font-size:18px}.voltage-limits{margin-top:7px;font-size:9px;gap:7px}.battery-bottom{margin-top:6px;font-size:8px;gap:4px}.battery-bottom .runtime{font-size:9px}.battery-spec{font-size:8px}.note{display:none}details{margin-top:7px;padding-top:4px;font-size:10px}summary::after{font-size:15px}footer{display:none}.calibration{font-size:9px;line-height:1.3;padding:4px 7px;margin-top:5px}.last-full{display:block;margin:8px 0}.main-status{font-size:8px}}
+      @media(max-width:365px){.shell{padding:8px 7px}.tile-title{font-size:8px}.tile-body strong{font-size:18px}.tile{min-height:55px}.diagram{max-height:225px}.nameplate{font-size:7px}.mode-switch button{padding:4px;font-size:8px}.battery-main .plain-value strong{font-size:23px}.battery-layout .mini strong{font-size:16px}.battery-title{font-size:10px}.battery-spec{font-size:7px}.battery-layout{gap:5px}.battery-bottom .runtime{font-size:8px}}
+      @media(max-width:520px) and (max-height:740px){.shell{padding-top:8px}.diagram{max-height:200px}.tile{min-height:52px;padding:6px}.tile-body{gap:4px}.battery-summary{padding:8px 9px}.battery-top{margin-bottom:4px}.voltage-limits{margin-top:5px}.battery-bottom{margin-top:4px}.calibration{font-size:8px}}
     </style>
     <ha-card class="shell"><header><div><div class="eyebrow">МОЙ ДОМ · ANENJI 4200</div><h1>Энергетика</h1><div class="sub">Солнце, сеть и энергия вашего дома</div></div><span class="live" data-live><span class="dot"></span><span data-live-text>Подключение</span></span></header>
     <svg class="diagram" viewBox="0 0 720 500" aria-label="Схема потоков энергии">
@@ -107,18 +113,29 @@ class EnergetikaCard extends HTMLElement {
       ${this._tile('grid_load','Сеть → нагрузка','Питание через байпас','grid','grid')}
       ${this._tile('battery_load','АКБ → нагрузка','Разряд аккумулятора в дом','down','battery')}
       ${this._tile('load','Нагрузка · всего','Потребление дома','home','home')}
-      <div class="tile battery battery-summary"><div class="battery-title">${icon('battery')}Аккумулятор <span style="margin-left:auto;color:#648b90;font-size:9px">25,6 В · 100 А·ч</span></div><div class="battery-main"><button class="plain-value" data-key="battery" title="История оставшейся энергии"><strong>${value('battery','Вт·ч')}</strong></button><span class="capacity">из 2560 Вт·ч</span></div><button class="runtime" data-key="runtime" title="Оценка по текущей мощности разряда АКБ"><span data-runtime>До 20% · —</span></button><div class="bar"><span data-battery-bar></span></div><div class="mini-row">${mini('percent','По расходу энергии','%')}${mini('voltage','Напряжение АКБ','В')}</div><div class="battery-extra"><span>Оценка инвертора: <button data-key="inverter_percent"><span data-value="inverter_percent">—</span>%</button></span><button data-key="inverter_energy"><span data-value="inverter_energy">—</span> Вт·ч</button></div></div>
+      <button class="tile battery" data-key="voltage" title="История напряжения аккумулятора">${icon('battery')}<span class="tile-body"><span class="tile-title">Напряжение АКБ</span><strong>${value('voltage','В')}</strong></span></button>
+      <div class="tile battery battery-summary">
+        <div class="battery-top"><div class="battery-title">${icon('battery')}АКБ <span class="nameplate">25,6 В · 100 А·ч</span></div><div class="mode-switch" role="group" aria-label="Способ оценки заряда"><button data-mode="energy" aria-pressed="true">Энергия</button><button data-mode="voltage" aria-pressed="false">По напряжению</button></div></div>
+        <div class="battery-layout"><div class="battery-main"><button class="plain-value" data-primary data-key="battery" title="История оставшейся энергии"><strong><span data-primary-value>—</span><span class="unit" data-primary-unit>Вт·ч</span></strong></button><span class="capacity" data-mode-caption>из 2560 Вт·ч</span></div><button class="mini" data-secondary data-key="percent"><span data-secondary-label>По энергии</span><strong><span data-secondary-value>—</span><span class="unit" data-secondary-unit>%</span></strong></button>${mini('voltage','Напряжение','В')}</div>
+        <div class="voltage-limits"><button class="voltage-min" data-key="voltage_min" title="Нижний порог автономной работы из настроек инвертора"><span data-value="voltage_min">—</span> В</button><div class="bar" title="Напряжение АКБ между нижним и верхним пределами"><span data-battery-bar></span></div><span class="voltage-max" title="Верхний предел оценки по напряжению">29,0 В</span></div>
+        <div class="battery-bottom"><button class="runtime" data-key="runtime" title="По учёту энергии и текущему разряду АКБ"><span data-runtime>До 20% · —</span></button><span class="battery-spec" title="Подтверждённый предел разряда 100 А. При номинальных 25,6 В — 2560 Вт на стороне АКБ; мощность AC зависит от потерь.">Разряд ≤100 А · 2,56 кВт ном.</span></div>
+      </div>
       <div class="charge-tile">${this._tile('charge','Заряд АКБ · всего','Сеть + солнце','up','battery')}</div>
     </div>
-    <div class="calibration" data-calibration></div>
+
     <div class="note">Стрелки движутся в направлении передачи энергии. Ток сети ≈ P/U (оценка активного тока). Таймер — по текущему разряду до резерва 20%, при смене нагрузки пересчитывается. Распределение потоков — расчёт интеграции инвертора; разница с нагрузкой может включать потери и собственное потребление.</div>
-    <details><summary>Как считается энергия аккумулятора</summary><p>Номинальная энергия — <b>2560 Вт·ч</b>. Счётчик складывает энергию заряда и вычитает энергию разряда: мощность × время. Например, 500 Вт в течение часа — 500 Вт·ч. Напряжение и процент инвертора показаны отдельно и не пересчитывают этот остаток. Значение сохраняется на сервере и считается при закрытой панели.</p><p>После подтверждённого полного заряда остаток устанавливается в 2560 Вт·ч. Автокалибровка: напряжение достигло настройки заряда инвертора (с допуском 0,2 В), ток заряда не выше 2 А и мощность АКБ по модулю не выше 60 Вт в течение 5 минут. Это оценка полного заряда, поскольку сигнала BMS нет. Кнопку используйте только когда уверены, что аккумулятор заряжен полностью.</p><button class="calibrate" data-calibrate>АКБ полностью заряжена</button><span class="last-full" data-last-full></span><div class="toast" role="status" data-toast></div></details>
+    <details><summary>Об аккумуляторе <span class="main-status" data-main-status></span></summary><div class="calibration" data-calibration></div><p>Режим «Энергия» — остаток по мощности и времени. Режим «По напряжению» — линейная оценка от нижнего порога автономной работы до 29,0 В: она зависит от нагрузки и не меняет счётчик Вт·ч. Выбор сохраняется на этом устройстве. Таймер в обоих режимах рассчитан по учтённой энергии. Максимальный разряд АКБ — 100 А, номинально 2,56 кВт при 25,6 В; доступная мощность на выходе AC ниже из-за потерь.</p><p>Штатная оценка инвертора: <button class="plain-value" data-key="inverter_percent"><span data-value="inverter_percent">—</span>%</button> · <button class="plain-value" data-key="inverter_energy"><span data-value="inverter_energy">—</span> Вт·ч</button>.</p><p>Номинальная энергия — <b>2560 Вт·ч</b>. Счётчик складывает энергию заряда и вычитает энергию разряда: мощность × время. Например, 500 Вт в течение часа — 500 Вт·ч. Напряжение и процент инвертора показаны отдельно и не пересчитывают этот остаток. Значение сохраняется на сервере и считается при закрытой панели.</p><p>После подтверждённого полного заряда остаток устанавливается в 2560 Вт·ч. Автокалибровка: напряжение достигло настройки заряда инвертора (с допуском 0,2 В), ток заряда не выше 2 А и мощность АКБ по модулю не выше 60 Вт в течение 5 минут. Это оценка полного заряда, поскольку сигнала BMS нет. Кнопку используйте только когда уверены, что аккумулятор заряжен полностью.</p><button class="calibrate" data-calibrate>АКБ полностью заряжена</button><span class="last-full" data-last-full></span><div class="toast" role="status" data-toast></div></details>
     <footer><span>ЛОКАЛЬНЫЙ МОНИТОРИНГ</span><span data-updated>Ожидание данных</span></footer></ha-card>`;
     root.querySelectorAll('[data-key]').forEach(el=>{
       const open = e=>{e.stopPropagation();this._moreInfo(el.dataset.key);};
       el.addEventListener('click',open);
       if (el.tagName.toLowerCase() !== 'button') el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open(e);}});
     });
+    root.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>{
+      this._batteryMode=button.dataset.mode;
+      try { localStorage.setItem('energetika.battery-mode',this._batteryMode); } catch {}
+      this._update();
+    }));
     root.querySelector('[data-calibrate]').addEventListener('click',()=>this._calibrate());
     this._update();
   }
@@ -126,7 +143,7 @@ class EnergetikaCard extends HTMLElement {
     const s = this._hass?.states[this._entities[key]];
     if (!s || ['unknown','unavailable',''].includes(s.state)) return null;
     const n = Number(s.state);
-    const bounds={load:[0,8400],solar:[0,5400],grid:[-11000,11000],battery_power:[-8400,8400],charge:[0,8400],discharge:[0,8400],battery:[0,2560],percent:[0,100]};
+    const bounds={load:[0,8400],solar:[0,5400],grid:[-11000,11000],battery_power:[-8400,8400],charge:[0,8400],discharge:[0,8400],battery:[0,2560],percent:[0,100],percent_voltage:[0,100],voltage_min:[1,39],voltage:[0,40]};
     const limit=bounds[key]||(['pv_battery','pv_load','grid_battery','grid_load','battery_load'].includes(key)?[0,11000]:null);
     return Number.isFinite(n)&&(!limit||(n>=limit[0]&&n<=limit[1])) ? n : null;
   }
@@ -138,9 +155,24 @@ class EnergetikaCard extends HTMLElement {
       const digits=/voltage|current|percent/.test(key)?1:0;
       const str=n===null?'—':n.toLocaleString('ru-RU',{minimumFractionDigits:/voltage|current/.test(key)?1:0,maximumFractionDigits:digits});
       if(el.textContent!==str)el.textContent=str;
+      el.closest('.tile-body strong')?.classList.toggle('long-value',Math.abs(n??0)>=10000);
     });
     r.querySelectorAll('[data-flow]').forEach(el=>el.classList.toggle('active',(this._number(el.dataset.flow)??0)>3));
-    const pct=this._number('percent');r.querySelector('[data-battery-bar]').style.width=`${Math.min(100,Math.max(0,pct??0))}%`;
+    const voltageMode=this._batteryMode==='voltage';
+    r.querySelectorAll('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mode===this._batteryMode)));
+    const primaryKey=voltageMode?'percent_voltage':'battery',secondaryKey=voltageMode?'battery':'percent';
+    const primary=this._number(primaryKey),secondary=this._number(secondaryKey);
+    r.querySelector('[data-primary]').dataset.key=primaryKey;
+    r.querySelector('[data-primary]').title=voltageMode?'История оценки по напряжению':'История оставшейся энергии';
+    r.querySelector('[data-primary-value]').textContent=primary===null?'—':primary.toLocaleString('ru-RU',{maximumFractionDigits:voltageMode?1:0});
+    r.querySelector('[data-primary-unit]').textContent=voltageMode?'%':'Вт·ч';
+    r.querySelector('[data-mode-caption]').textContent=voltageMode?'Оценка по напряжению':'из 2560 Вт·ч';
+    r.querySelector('[data-mode-caption]').classList.toggle('mode-note',voltageMode);
+    r.querySelector('[data-secondary]').dataset.key=secondaryKey;
+    r.querySelector('[data-secondary-label]').textContent=voltageMode?'Учтено энергии':'По энергии';
+    r.querySelector('[data-secondary-value]').textContent=secondary===null?'—':secondary.toLocaleString('ru-RU',{maximumFractionDigits:voltageMode?0:1});
+    r.querySelector('[data-secondary-unit]').textContent=voltageMode?'Вт·ч':'%';
+    const pct=this._number('percent_voltage');r.querySelector('[data-battery-bar]').style.width=`${Math.min(100,Math.max(0,pct??0))}%`;
     const connected=this._hass.connected!==false && ['grid','solar','load','voltage'].every(k=>this._number(k)!==null);
     r.querySelector('[data-live]').classList.toggle('offline',!connected);
     r.querySelector('[data-live-text]').textContent=connected?'В реальном времени':'Нет данных';
@@ -152,6 +184,7 @@ class EnergetikaCard extends HTMLElement {
     const uncalibrated=this._number('battery')===null;
     const gap=energy?.attributes?.data_gap===true;
     message.classList.toggle('visible',uncalibrated||gap);
+    r.querySelector('[data-main-status]').textContent=uncalibrated?'Нужен полный заряд':gap?'Есть перерыв в учёте':'';
     message.textContent=uncalibrated?'Счётчик Вт·ч ожидает первого полного заряда. Он запустится после автокалибровки; если АКБ уже полная, подтвердите это кнопкой ниже.':gap?'Во время учёта был перерыв в данных. Остаток сохранён, но может быть неточным до следующего полного заряда.':'';
     const last=energy?.attributes?.last_full;
     r.querySelector('[data-last-full]').textContent=last?`Последний полный заряд: ${new Date(last).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}`:'Полный заряд ещё не подтверждён';

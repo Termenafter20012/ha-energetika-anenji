@@ -130,6 +130,26 @@ template:
             {% endif %}
 
   - sensor:
+      - name: Energetika Battery Percent Voltage
+        unique_id: energetika_battery_percent_voltage
+        default_entity_id: sensor.energetika_battery_percent_voltage
+        unit_of_measurement: "%"
+        device_class: battery
+        state_class: measurement
+        icon: mdi:battery-outline
+        availability: >-
+          {{ has_value('sensor.anenji_4200_protocol_1_battery_voltage')
+             and has_value('sensor.anenji_4200_protocol_1_battery_under_voltage_off_grid')
+             and 0 <= states('sensor.anenji_4200_protocol_1_battery_voltage') | float(-1) <= 40
+             and 0 < states('sensor.anenji_4200_protocol_1_battery_under_voltage_off_grid') | float(0) < 29 }}
+        state: >-
+          {% set v = states('sensor.anenji_4200_protocol_1_battery_voltage') | float(0) %}
+          {% set low = states('sensor.anenji_4200_protocol_1_battery_under_voltage_off_grid') | float(0) %}
+          {{ [[(v - low) / (29 - low) * 100, 0] | max, 100] | min | round(1) if low < 29 else none }}
+        attributes:
+          method: Linear voltage estimate; load dependent; independent of energy accounting
+          upper_voltage: 29
+          lower_voltage: "{{ states('sensor.anenji_4200_protocol_1_battery_under_voltage_off_grid') | float(none) }}"
       - name: Energetika Battery Percent Energy
         unique_id: energetika_battery_percent_energy
         default_entity_id: sensor.energetika_battery_percent_energy
