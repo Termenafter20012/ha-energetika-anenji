@@ -1,0 +1,125 @@
+title: Энергетика
+views:
+- title: Сейчас
+  path: live
+  type: panel
+  cards:
+  - type: vertical-stack
+    cards:
+    - type: custom:energetika-card
+    - type: custom:energetika-history-card
+      title: Солнце, дом, сеть и аккумулятор · 24 часа
+      unit: Вт
+      date_selector: false
+      entities:
+      - entity: sensor.anenji_4200_protocol_1_pv_power
+        name: Солнце
+        color: '#ffd65a'
+        maximum: 5400
+        minimum: 0
+      - entity: sensor.anenji_4200_protocol_1_load_power
+        name: Дом
+        color: '#bc7bff'
+        maximum: 8400
+        minimum: 0
+      - entity: sensor.anenji_4200_protocol_1_grid_power
+        name: Сеть
+        color: '#38bfff'
+        maximum: 11000
+        minimum: -11000
+      - entity: sensor.zariadka_akb
+        name: Зарядка АКБ
+        color: '#52b788'
+        maximum: 8400
+        minimum: 0
+      - entity: sensor.razriadka_akb
+        name: Разрядка АКБ
+        color: '#f9844a'
+        maximum: 8400
+        minimum: 0
+    - type: custom:energetika-history-card
+      title: Зарядка и разрядка аккумулятора · 24 часа
+      unit: Вт
+      date_selector: false
+      entities:
+      - entity: sensor.zariadka_akb
+        name: Зарядка АКБ
+        color: '#52b788'
+        maximum: 8400
+        minimum: 0
+      - entity: sensor.razriadka_akb
+        name: Разрядка АКБ
+        color: '#f9844a'
+        maximum: 8400
+        minimum: 0
+    - type: custom:energetika-history-card
+      title: Уровень заряда аккумулятора · 24 часа
+      unit: '%'
+      date_selector: false
+      entities:
+      - entity: sensor.anenji_4200_protocol_1_battery_percent
+        name: Заряд АКБ
+        color: '#52b788'
+        maximum: 100
+        minimum: 0
+- title: За день
+  path: today
+  type: panel
+  cards:
+  - type: vertical-stack
+    cards:
+    - type: custom:energetika-history-card
+      title: Солнце, дом, сеть и аккумулятор
+      unit: Вт
+      date_selector: true
+      entities:
+      - entity: sensor.anenji_4200_protocol_1_pv_power
+        name: Солнце
+        color: '#ffd65a'
+        maximum: 5400
+        minimum: 0
+      - entity: sensor.anenji_4200_protocol_1_load_power
+        name: Дом
+        color: '#bc7bff'
+        maximum: 8400
+        minimum: 0
+      - entity: sensor.anenji_4200_protocol_1_grid_power
+        name: Сеть
+        color: '#38bfff'
+        maximum: 11000
+        minimum: -11000
+      - entity: sensor.zariadka_akb
+        name: Зарядка АКБ
+        color: '#52b788'
+        maximum: 8400
+        minimum: 0
+      - entity: sensor.razriadka_akb
+        name: Разрядка АКБ
+        color: '#f9844a'
+        maximum: 8400
+        minimum: 0
+    - type: custom:energetika-history-card
+      title: Зарядка и разрядка аккумулятора
+      unit: Вт
+      date_selector: true
+      entities:
+      - entity: sensor.zariadka_akb
+        name: Зарядка АКБ
+        color: '#52b788'
+        maximum: 8400
+        minimum: 0
+      - entity: sensor.razriadka_akb
+        name: Разрядка АКБ
+        color: '#f9844a'
+        maximum: 8400
+        minimum: 0
+    - type: custom:energetika-history-card
+      title: Уровень заряда аккумулятора
+      unit: '%'
+      date_selector: true
+      entities:
+      - entity: sensor.anenji_4200_protocol_1_battery_percent
+        name: Заряд АКБ
+        color: '#52b788'
+        maximum: 100
+        minimum: 0

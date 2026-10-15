@@ -1,0 +1,196 @@
+# Energy accounting for a 25.6 V, 100 Ah battery: 2560 Wh nominal.
+# No inverter controls are written. Positive battery_power means charging.
+# Remaining energy is restored by Home Assistant and changes only by W * h.
+input_button:
+  energetika_battery_full:
+    name: "Энергетика · АКБ полностью заряжена"
+    icon: mdi:battery-check
+
+template:
+  - binary_sensor:
+      - name: Energetika Battery Full Qualified
+        unique_id: energetika_battery_full_qualified
+        default_entity_id: binary_sensor.energetika_battery_full_qualified
+        availability: >-
+          {{ has_value('sensor.anenji_4200_protocol_1_battery_voltage')
+             and has_value('sensor.anenji_4200_protocol_1_battery_bulk_voltage')
+             and has_value('sensor.anenji_4200_protocol_1_charge_average_current')
+             and has_value('sensor.anenji_4200_protocol_1_battery_power') }}
+        state: >-
+          {{ is_state('binary_sensor.anenji_4200_protocol_1_battery_connected', 'on')
+             and is_state('binary_sensor.anenji_4200_protocol_1_charging_active', 'on')
+             and as_timestamp(now()) - as_timestamp(states.sensor.anenji_4200_protocol_1_battery_power.last_reported, 0) < 120
+             and states('sensor.anenji_4200_protocol_1_battery_voltage') | float(0)
+                 >= states('sensor.anenji_4200_protocol_1_battery_bulk_voltage') | float(99) - 0.2
+             and 0 <= states('sensor.anenji_4200_protocol_1_charge_average_current') | float(99) <= 2
+             and states('sensor.anenji_4200_protocol_1_battery_power') | float(999) | abs <= 60 }}
+        delay_on:
+          minutes: 5
+        delay_off:
+          seconds: 30
+
+  - triggers:
+      - trigger: state
+        entity_id: sensor.anenji_4200_protocol_1_battery_power
+        id: power
+      - trigger: time_pattern
+        seconds: "/10"
+        id: tick
+      - trigger: homeassistant
+        event: start
+        id: startup
+      - trigger: state
+        entity_id: input_button.energetika_battery_full
+        id: manual_full
+      - trigger: state
+        entity_id: binary_sensor.energetika_battery_full_qualified
+        to: "on"
+        id: auto_full
+    sensor:
+      - name: Energetika Battery Remaining
+        unique_id: energetika_battery_remaining
+        default_entity_id: sensor.energetika_battery_remaining
+        device_class: energy_storage
+        state_class: measurement
+        unit_of_measurement: Wh
+        icon: mdi:battery-high
+        state: >-
+          {% set full = trigger.id == 'auto_full' or
+             (trigger.id == 'manual_full' and trigger.from_state is not none
+              and trigger.to_state is not none
+              and trigger.to_state.state not in ['unknown', 'unavailable']
+                and trigger.from_state.state != trigger.to_state.state
+                and (as_timestamp(now()) - as_timestamp(trigger.to_state.state, 0)) | abs < 10) %}
+          {% set previous = this.state | float(none) %}
+          {% set t = as_timestamp(now()) %}
+          {% set dt = t - (this.attributes.get('sample_timestamp', t) | float(t)) %}
+          {% set src = states.sensor.anenji_4200_protocol_1_battery_power %}
+          {% set valid = has_value('sensor.anenji_4200_protocol_1_battery_power')
+              and states('sensor.anenji_4200_protocol_1_battery_power') | float(99999) | abs <= 8400
+              and t - as_timestamp(src.last_reported, 0) < 120
+              and is_state('binary_sensor.anenji_4200_protocol_1_battery_connected', 'on') %}
+          {% if full %}
+            2560
+          {% elif previous is none %}
+            {{ none }}
+          {% elif trigger.id == 'startup' or not valid
+              or not this.attributes.get('sample_valid', false) or dt < 0 or dt > 120 %}
+            {{ previous }}
+          {% else %}
+            {% set delta = (this.attributes.get('sample_power_w', 0) | float(0)) * dt / 3600 %}
+            {{ [[previous + delta, 0] | max, 2560] | min | round(4) }}
+          {% endif %}
+        attributes:
+          capacity_wh: 2560
+          nominal_voltage: 25.6
+          capacity_ah: 100
+          sample_timestamp: "{{ as_timestamp(now()) }}"
+          sample_power_w: "{{ states('sensor.anenji_4200_protocol_1_battery_power') | float(0) }}"
+          sample_valid: >-
+            {{ has_value('sensor.anenji_4200_protocol_1_battery_power')
+              and states('sensor.anenji_4200_protocol_1_battery_power') | float(99999) | abs <= 8400
+               and as_timestamp(now()) - as_timestamp(states.sensor.anenji_4200_protocol_1_battery_power.last_reported, 0) < 120
+               and is_state('binary_sensor.anenji_4200_protocol_1_battery_connected', 'on') }}
+          last_full: >-
+            {% if trigger.id == 'auto_full' or
+               (trigger.id == 'manual_full' and trigger.from_state is not none
+                and trigger.to_state is not none
+                and trigger.to_state.state not in ['unknown', 'unavailable']
+                and trigger.from_state.state != trigger.to_state.state
+                and (as_timestamp(now()) - as_timestamp(trigger.to_state.state, 0)) | abs < 10) %}
+              {{ now().isoformat() }}
+            {% else %}
+              {{ this.attributes.get('last_full', '') }}
+            {% endif %}
+          calibration_source: >-
+            {% if trigger.id == 'auto_full' %}charge_completion
+            {% elif trigger.id == 'manual_full' and trigger.from_state is not none
+                and trigger.to_state is not none
+                and trigger.to_state.state not in ['unknown', 'unavailable']
+                and trigger.from_state.state != trigger.to_state.state
+                and (as_timestamp(now()) - as_timestamp(trigger.to_state.state, 0)) | abs < 10 %}manual
+            {% else %}{{ this.attributes.get('calibration_source', 'not_calibrated') }}{% endif %}
+          data_gap: >-
+            {% set full = trigger.id == 'auto_full' or
+               (trigger.id == 'manual_full' and trigger.from_state is not none
+                and trigger.to_state is not none
+                and trigger.to_state.state not in ['unknown', 'unavailable']
+                and trigger.from_state.state != trigger.to_state.state
+                and (as_timestamp(now()) - as_timestamp(trigger.to_state.state, 0)) | abs < 10) %}
+            {% set t = as_timestamp(now()) %}
+            {% set dt = t - (this.attributes.get('sample_timestamp', t) | float(t)) %}
+            {% if full %}{{ false }}
+            {% else %}
+              {{ this.attributes.get('data_gap', false)
+                 or trigger.id == 'startup' or dt > 120
+                 or not has_value('sensor.anenji_4200_protocol_1_battery_power')
+              and states('sensor.anenji_4200_protocol_1_battery_power') | float(99999) | abs <= 8400
+                 or t - as_timestamp(states.sensor.anenji_4200_protocol_1_battery_power.last_reported, 0) >= 120
+                 or not is_state('binary_sensor.anenji_4200_protocol_1_battery_connected', 'on') }}
+            {% endif %}
+
+  - sensor:
+      - name: Energetika Battery Percent Energy
+        unique_id: energetika_battery_percent_energy
+        default_entity_id: sensor.energetika_battery_percent_energy
+        unit_of_measurement: "%"
+        state_class: measurement
+        icon: mdi:battery
+        availability: "{{ has_value('sensor.energetika_battery_remaining') }}"
+        state: "{{ (states('sensor.energetika_battery_remaining') | float(0) / 2560 * 100) | round(1) }}"
+      - name: Energetika Battery Used
+        unique_id: energetika_battery_used
+        default_entity_id: sensor.energetika_battery_used
+        unit_of_measurement: Wh
+        device_class: energy_storage
+        state_class: measurement
+        icon: mdi:battery-minus
+        availability: "{{ has_value('sensor.energetika_battery_remaining') }}"
+        state: "{{ (2560 - states('sensor.energetika_battery_remaining') | float(0)) | round(2) }}"
+      - name: Energetika Battery Remaining Inverter
+        unique_id: energetika_battery_remaining_inverter
+        default_entity_id: sensor.energetika_battery_remaining_inverter
+        unit_of_measurement: Wh
+        device_class: energy_storage
+        state_class: measurement
+        icon: mdi:battery-sync
+        availability: "{{ has_value('sensor.anenji_4200_protocol_1_battery_percent') }}"
+        state: "{{ (states('sensor.anenji_4200_protocol_1_battery_percent') | float(0) * 25.6) | round(0) }}"
+
+      - name: Energetika Grid Current Estimate
+        unique_id: energetika_grid_current_estimate
+        default_entity_id: sensor.energetika_grid_current_estimate
+        unit_of_measurement: A
+        device_class: current
+        state_class: measurement
+        icon: mdi:current-ac
+        availability: >-
+          {{ has_value('sensor.anenji_4200_protocol_1_grid_power')
+             and has_value('sensor.anenji_4200_protocol_1_grid_voltage')
+             and states('sensor.anenji_4200_protocol_1_grid_power') | float(99999) | abs <= 11000
+             and 0 <= states('sensor.anenji_4200_protocol_1_grid_voltage') | float(999) <= 300 }}
+        state: >-
+          {% set v = states('sensor.anenji_4200_protocol_1_grid_voltage') | float(0) %}
+          {{ (states('sensor.anenji_4200_protocol_1_grid_power') | float(0) / v) | round(2) if v > 20 else 0 }}
+        attributes:
+          method: Active current estimate P/U; not RMS current without power factor
+      - name: Energetika Battery Runtime To Reserve
+        unique_id: energetika_battery_runtime_to_reserve
+        default_entity_id: sensor.energetika_battery_runtime_to_reserve
+        unit_of_measurement: min
+        device_class: duration
+        state_class: measurement
+        icon: mdi:timer-sand
+        availability: >-
+          {{ has_value('sensor.energetika_battery_remaining')
+             and has_value('sensor.anenji_4200_protocol_1_battery_power')
+             and state_attr('sensor.energetika_battery_remaining', 'sample_valid') == true
+             and -8400 <= states('sensor.anenji_4200_protocol_1_battery_power') | float(0) < -5 }}
+        state: >-
+          {% set usable = [states('sensor.energetika_battery_remaining') | float(0) - 512, 0] | max %}
+          {% set draw = states('sensor.anenji_4200_protocol_1_battery_power') | float(0) | abs %}
+          {{ (usable / draw * 60) | round(1) if draw > 5 else 0 }}
+        attributes:
+          reserve_percent: 20
+          reserve_wh: 512
+          assumption: Current net battery discharge power remains constant

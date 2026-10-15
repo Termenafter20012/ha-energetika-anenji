@@ -1,0 +1,10 @@
+.upstream-eybond/
+.codex-remote-attachments/
+.deploy/
+.preview/
+__pycache__/
+*.pyc
+configuration.original.yaml
+configuration.yaml
+upgrade_sources.py
+node_modules/
