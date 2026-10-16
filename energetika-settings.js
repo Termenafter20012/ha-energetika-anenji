@@ -232,7 +232,10 @@ class EnergetikaSettingsPanel extends HTMLElement {
     const waitForReadback=()=>{if(this._pending===operation)this._timeout=setTimeout(()=>this._finish(operation,{kind:'error',text:'Подтверждение не получено. Проверьте фактическое значение перед повторной отправкой.'}),20000);};
     const domain=id.split('.')[0],service=domain==='number'?'set_value':domain==='select'?'select_option':value==='on'?'turn_on':'turn_off';
     const data={entity_id:id,...(domain==='number'?{value}:domain==='select'?{option:value}:{})};
-    try {await this._hass.callService(domain,service,data);if(this._pending!==operation)return;operation.accepted=true;this._settle();waitForReadback();}
+    try {
+      if(id.endsWith('_output_source_priority')&&this._hass.states['input_boolean.energetika_solar_auto']?.state==='on')
+        await this._hass.callService('script','energetika_solar_pause',{});
+      await this._hass.callService(domain,service,data);if(this._pending!==operation)return;operation.accepted=true;this._settle();waitForReadback();}
     catch(error){
       if(this._pending!==operation)return;
       const message=String(error?.message||error||'');
