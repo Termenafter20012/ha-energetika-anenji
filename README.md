@@ -7,8 +7,11 @@
 
 [Меню режимів UTI / SOL / SBU / SUB / SUF](docs/screenshots/mode-menu.jpg)
 
+[Шестерня на схемі](docs/screenshots/settings-entry.jpg) · [Налаштування інвертора російською](docs/screenshots/settings.jpg) · [Довідка про режими](docs/screenshots/settings-info.jpg)
+
 ## Можливості
 
+- Шестерня відкриває доступні налаштування інвертора: зрозумілі російські назви або вихідні назви, пошук, розділи та i з поясненнями параметрів і режимів. Кожний запис підтверджується окремо; значення чекає відповіді інвертора.
 - Меню режимів **UTI, SOL, SBU, SUB, SUF** над вузлом мережі: вибір, підтвердження та очікування відповіді інвертора. Потрібне окремо ввімкнене керування EyeBond Local.
 - П'ять напрямків: сонце → АКБ, сонце → будинок, мережа → АКБ, мережа → будинок через байпас, АКБ → будинок.
 - Потужність, напруга та струм кожного вузла. Струм мережі позначений **≈**: це оцінка активної складової `P/U`, а не виміряний RMS-струм із коефіцієнтом потужності.
@@ -66,7 +69,7 @@ Home Assistant 2026.10, EyeBond Local **0.1.53**, драйвер `modbus_smg`, �
 
 Повні кроки, відповідність сутностей, оновлення і відкат — у **[docs/INSTALL.uk.md](docs/INSTALL.uk.md)**.
 
-Скопіюйте `energetika.yaml` до каталогу конфігурації HA, обидва JS-файли — до `www`, додайте пакет у `homeassistant.packages`, додайте ресурс `/local/energetika-card.js?v=2.3.0` типу JavaScript module і вставте `dashboard-energetika.yaml` у текстовий редактор окремої панелі. Не замінюйте власний `configuration.yaml` цілком.
+Скопіюйте `energetika.yaml` до каталогу конфігурації HA, три JS-файли (`energetika-card.js`, `energetika-history.js`, `energetika-settings.js`) — до `www`, додайте пакет у `homeassistant.packages`, додайте ресурс `/local/energetika-card.js?v=2.4.1` типу JavaScript module і вставте `dashboard-energetika.yaml` у текстовий редактор окремої панелі. Не замінюйте власний `configuration.yaml` цілком.
 
 Для сумісного драйвера використайте `patches/install_guard.py`. Самостійний офлайн-інсталятор цієї конкретної конфігурації збирається командою `python build_deploy.py` у `.deploy/install_energetika_v2.py`. Перед застосуванням на іншому обладнанні адаптуйте всі сутності, ємність і межі.
 

@@ -1,4 +1,4 @@
-"""Backport output-priority names to the installed EyeBond Local 0.1.53 model.
+"""Backport ANENJI metadata to the installed EyeBond Local 0.1.53 model.
 
 Only model metadata is changed. No control policy or inverter register is written.
 Codes 0..3 follow current upstream SMG schema. Code 4 (SUF) is confirmed in
@@ -13,6 +13,14 @@ import shutil
 
 LABELS = ["Utility First (UTI)", "Solar First (SOL)", "Solar-Battery-Utility (SBU)", "Solar-Utility-Battery (SUB)", "Solar-Utility-Feed (SUF)"]
 DESCRIPTIONS = ["Utility powers the load first.", "Solar powers the load first.", "Solar, then battery, then utility.", "Solar, then utility, then battery.", "Solar and utility; surplus solar may feed into the grid."]
+VOLTAGE_KEYS = ["battery_bulk_voltage", "battery_float_voltage", "battery_overvoltage_protection_voltage", "battery_redischarge_voltage", "battery_under_voltage", "battery_under_voltage_off_grid", "battery_equalization_voltage"]
+
+
+def mode_capabilities():
+    return [{"key": "output_source_priority", "choices": [
+        {"value": code, "label": label, "order": code, "description": DESCRIPTIONS[code]}
+        for code, label in enumerate(LABELS)
+    ]}]
 
 
 def replacements(base):
@@ -23,10 +31,13 @@ def replacements(base):
         original = (base / relative).read_text(encoding="utf-8")
         doc = json.loads(original)
         if relative == profile:
-            doc["capabilities"] = [{"key": "output_source_priority", "choices": [
-                {"value": code, "label": label, "order": code, "description": DESCRIPTIONS[code]}
-                for code, label in enumerate(LABELS)
-            ]}]
+            # Family defaults are 48 V (40..65/70 V), incompatible with this
+            # 24 V model. Match upstream: do not invent firmware-specific limits.
+            doc["capabilities"] = mode_capabilities() + [
+                {"key": key, "minimum": None, "maximum": None,
+                 "note": "Exact model-specific setpoint limits are not documented. No inferred battery-voltage range is imposed; wire encoding and write confirmation still apply."}
+                for key in VOLTAGE_KEYS
+            ]
         else:
             doc["enum_tables"] = {"output_source_priority": {str(i): name for i, name in enumerate(LABELS)}}
         result[relative] = (original, json.dumps(doc, ensure_ascii=False, indent=2) + "\n")
@@ -35,6 +46,7 @@ def replacements(base):
 
 # SHA-256 of the normalized UTF-8 source from tag v0.1.53.
 EXPECTED = {'profiles/modbus_smg/models/anenji_4200_protocol_1.variant.json': '24ff0904a135544229d16e2b70dc3854c810cad691095f678da9b2e795364eee', 'register_schemas/modbus_smg/models/anenji_4200_protocol_1.json': 'fab083a95d1a0a8e2431df556e1a8f919641ecd2327bf9c69b816b4a40452164'}
+PREVIOUS_MODE_PROFILE = 'f916f1835c85233ad996c9554a3a1001a3063847ded1633fa3657f388c9000b2'
 
 
 def install(config):
@@ -49,7 +61,11 @@ def install(config):
             raise SystemExit("Refusing symlink: " + str(path))
         if original == updated:
             continue
-        if hashlib.sha256(original.encode()).hexdigest() != EXPECTED[relative]:
+        digest = hashlib.sha256(original.encode()).hexdigest()
+        # Accept only the original tag or our exact previous mode-only patch.
+        if relative.startswith("profiles/") and digest == PREVIOUS_MODE_PROFILE:
+            digest = EXPECTED[relative]
+        if digest != EXPECTED[relative]:
             raise SystemExit("Unexpected source version; no files modified: " + relative)
         changes[path] = updated
     if not changes:

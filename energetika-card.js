@@ -1,11 +1,12 @@
-import './energetika-history.js?v=2.3.0';
+import './energetika-history.js?v=2.4.1';
+import './energetika-settings.js?v=2.4.1';
 
 export function formatRuntime(minutes) {
   if (!Number.isFinite(minutes) || minutes < 0) return '—';
   const total=Math.floor(minutes);
   return total===0?'0 мин':`${Math.floor(total/60)} ч ${String(total%60).padStart(2,'0')} мин`;
 }
-/* Energetika 2.2 — local Home Assistant card, no external dependencies. */
+/* Energetika 2.4 — local Home Assistant card, no external dependencies. */
 const ROOT = 'sensor.anenji_4200_protocol_1_';
 const SOURCE_MODES = [
   {code:'UTI', option:'Utility First (UTI)', description:'Сеть в приоритете'},
@@ -99,22 +100,23 @@ class EnergetikaCard extends HTMLElement {
       @media(max-width:520px) and (max-height:740px){.shell{padding-top:8px}.diagram{max-height:200px}.tile{min-height:52px;padding:6px}.tile-body{gap:4px}.battery-summary{padding:8px 9px}.battery-top{margin-bottom:4px}.voltage-limits{margin-top:5px}.battery-bottom{margin-top:4px}.calibration{font-size:8px}}
       .diagram-wrap{position:relative}.inverter-mode{position:absolute;left:5px;top:8px;z-index:4}.source-trigger{display:flex;align-items:center;gap:9px;border:1px solid #2b5972;background:#0b2032ed;border-radius:10px;padding:8px 11px;font-size:12px;color:#89a7bb;min-height:33px;box-shadow:0 3px 14px #0003}.source-trigger strong{color:#bde9ff;font-size:13px}.source-trigger .caret{color:#51b9df}.source-trigger[aria-expanded=true]{border-color:#38bfff}.mode-popover{position:absolute;left:0;top:42px;width:min(310px,calc(100vw - 36px));padding:13px;border:1px solid #335c75;border-radius:17px;background:#0b1929fa;box-shadow:0 15px 45px #000a;color:#d8e7f3;backdrop-filter:blur(16px)}.mode-popover[hidden]{display:none}.mode-heading{display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:650;margin-bottom:10px}.mode-close{background:none;border:0;color:#93adbf;font-size:21px;padding:0 4px}.source-options{display:grid;gap:5px}.source-option{display:grid;grid-template-columns:44px 1fr 12px;align-items:center;gap:8px;border:1px solid #263e52;background:#101f31;border-radius:9px;padding:9px 10px;text-align:left;color:#abc1d2;font-size:11px;min-height:41px}.source-option strong{color:#e6f4ff;font-size:13px}.source-option[aria-selected=true]{border-color:#29c8c5;background:#123c3e}.source-option:disabled{cursor:default;opacity:.6}.source-option .check{color:#36dfb8}.mode-message{font-size:10px;line-height:1.5;color:#8eabbf;margin:9px 0;min-height:15px}.mode-message.error{color:#f1a094}.mode-message.success{color:#65dfb8}.mode-apply{width:100%;border:1px solid #298d9c;background:#12434e;color:#a1eff4;border-radius:9px;padding:9px;font-size:11px;font-weight:600}.mode-apply:disabled{opacity:.4;cursor:default}.mode-note{font-size:10px;line-height:1.4;color:#a6b9c7;margin:0 0 8px}.source-option small{font-size:10px;color:#83a3b7}.mode-message:empty{display:none}
       @media(max-width:520px){.inverter-mode{left:3px;top:5px}.source-trigger{font-size:10px;padding:5px 9px;gap:6px;min-height:28px;border-radius:8px}.source-trigger strong{font-size:11px}.mode-popover{top:34px;padding:11px}.source-option{padding:8px 9px;font-size:10px;min-height:39px}.mode-heading{font-size:12px}.mode-message{font-size:10px}}
+      .settings-gear{position:absolute;right:5px;top:8px;z-index:3;width:34px;height:34px;display:grid;place-items:center;padding:7px;border:1px solid #33546d;border-radius:10px;background:#102439dc;color:#92b4cc;box-shadow:0 3px 14px #0003}.settings-gear:hover{color:#90e7df;border-color:#41aaa6}.settings-gear svg{width:20px;height:20px}.source-row{display:flex;align-items:center;gap:5px}.source-row .source-option{flex:1;min-width:0}.source-info{width:25px;height:25px;flex-shrink:0;padding:0;border:1px solid #3a6177;border-radius:50%;background:#153144;color:#87cddd;font:bold 14px Georgia,serif}.mode-setting-link{display:block;margin-top:9px;width:100%;padding:6px;background:none;border:0;color:#7ba9c1;font-size:10px}@media(max-width:520px){.settings-gear{right:3px;top:5px;width:29px;height:29px;padding:5px;border-radius:8px}.settings-gear svg{width:18px;height:18px}}
     </style>
     <ha-card class="shell"><header><div><div class="eyebrow">МОЙ ДОМ · ANENJI 4200</div><h1>Энергетика</h1><div class="sub">Солнце, сеть и энергия вашего дома</div></div><span class="live" data-live><span class="dot"></span><span data-live-text>Подключение</span></span></header>
-    <div class="diagram-wrap"><div class="inverter-mode"><button class="source-trigger" data-source-open aria-haspopup="dialog" aria-expanded="false"><span>Режим</span><strong data-source-current>—</strong><span class="caret">⌄</span></button><div class="mode-popover" data-source-popover role="dialog" aria-label="Режим питания инвертора" hidden><div class="mode-heading">Приоритет питания<button class="mode-close" data-source-close aria-label="Закрыть выбор режима">×</button></div><div class="source-options" data-source-options role="listbox" aria-label="Доступные режимы"></div><div class="mode-message" data-source-message role="status"></div><p class="mode-note" data-source-note hidden>Переключение изменит источник питания дома.</p><button class="mode-apply" data-source-apply disabled>Применить режим</button></div></div>
+    <div class="diagram-wrap"><button class="settings-gear" data-settings-open aria-label="Настройки инвертора" title="Настройки инвертора"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 3-.6 2.1-1.5.9-2.1-.5-2 3.5 1.5 1.6v1.8L2.8 14l2 3.5 2.1-.5 1.5.9L9 20h4l.6-2.1 1.5-.9 2.1.5 2-3.5-1.5-1.6v-1.8L19.2 9l-2-3.5-2.1.5-1.5-.9L13 3Z"/><circle cx="11" cy="11.5" r="3.2"/></svg></button><div class="inverter-mode"><button class="source-trigger" data-source-open aria-haspopup="dialog" aria-expanded="false"><span>Режим</span><strong data-source-current>—</strong><span class="caret">⌄</span></button><div class="mode-popover" data-source-popover role="dialog" aria-label="Режим питания инвертора" hidden><div class="mode-heading">Приоритет питания<button class="mode-close" data-source-close aria-label="Закрыть выбор режима">×</button></div><div class="source-options" data-source-options role="group" aria-label="Доступные режимы"></div><div class="mode-message" data-source-message role="status"></div><p class="mode-note" data-source-note hidden>Переключение изменит источник питания дома.</p><button class="mode-apply" data-source-apply disabled>Применить режим</button><button class="mode-setting-link" data-settings-link>Все настройки инвертора →</button></div></div>
     <svg class="diagram" viewBox="0 0 720 500" aria-label="Схема потоков энергии">
       <defs>${['solar','grid','battery'].map(c=>`<marker id="arrow-${c}" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0 0 5 2.5 0 5Z" fill="var(--${c})"/></marker>`).join('')}
       <linearGradient id="roof" x2="1" y2="1"><stop stop-color="#284361"/><stop offset="1" stop-color="#0c1829"/></linearGradient><linearGradient id="window" x2="0" y2="1"><stop stop-color="#ffc65e"/><stop offset="1" stop-color="#8e5b21"/></linearGradient><radialGradient id="halo"><stop stop-color="#22a891" stop-opacity=".12"/><stop offset="1" stop-color="#081421" stop-opacity="0"/></radialGradient></defs>
       <ellipse cx="365" cy="280" rx="280" ry="150" fill="url(#halo)"/>
       <g class="scene"><path d="M170 237 348 132 552 237 518 255 348 170 205 256Z" fill="url(#roof)" stroke="#3a5871"/><path d="M207 255v118h308V254L348 170Z" fill="#102232" stroke="#2e4b61"/><path d="M210 373h315" stroke="#46616b"/><path d="m287 195 63-35 111 57-64 36Z" fill="#12314a" stroke="#487896"/><path d="m310 182 109 58m-84-72 109 59m-132-19 61-35m-33 50 62-35" stroke="#36637f" stroke-width="2"/><rect x="222" y="279" width="47" height="58" rx="2" fill="url(#window)"/><path d="M245 279v58m-23-27h47" stroke="#233e4b" stroke-width="4"/><rect x="451" y="279" width="43" height="58" rx="2" fill="url(#window)"/><path d="M472 279v58m-21-27h43" stroke="#233e4b" stroke-width="4"/><path d="M179 374h366" stroke="#2a4c50" stroke-width="3"/></g>
-      ${this._flow('pv_battery','M513 146V198H357V274',402,198,'solar','Солнце → АКБ')}
-      ${this._flow('pv_load','M625 146V274',625,218,'solar','Солнце → нагрузка')}
+      ${this._flow('pv_battery','M428 146V198H357V274',357,230,'solar','Солнце → АКБ')}
+      ${this._flow('pv_load','M540 146V218H625V274',625,238,'solar','Солнце → нагрузка')}
       ${this._flow('grid_battery','M104 242V330H278',193,330,'grid','Сеть → АКБ')}
       ${this._flow('grid_load','M104 242V454H616V386',357,454,'grid','Сеть → нагрузка, байпас')}
       ${this._flow('battery_load','M450 330H531',491,330,'battery','АКБ → нагрузка')}
       <text x="357" y="489" class="route-caption">СЕТЬ → ДОМ · БАЙПАС</text>
       ${this._node('grid','Сеть','grid',18,130,174,'grid')}
-      ${this._node('solar','Солнце','sun',480,34,205,'solar')}
+      ${this._node('solar','Солнце','sun',395,34,205,'solar')}
       ${this._node('battery','АКБ','battery',278,274,172,'battery','Вт·ч осталось')}
       ${this._node('load','Нагрузка','home',531,274,174,'home')}
     </svg></div>
@@ -139,7 +141,7 @@ class EnergetikaCard extends HTMLElement {
 
     <div class="note">Стрелки движутся в направлении передачи энергии. Ток сети ≈ P/U (оценка активного тока). Таймер — по текущему разряду до резерва 20%, при смене нагрузки пересчитывается. Распределение потоков — расчёт интеграции инвертора; разница с нагрузкой может включать потери и собственное потребление.</div>
     <details><summary>Об аккумуляторе <span class="main-status" data-main-status></span></summary><div class="calibration" data-calibration></div><p>Режим «Энергия» — остаток по мощности и времени. Режим «По напряжению» — линейная оценка от нижнего порога автономной работы до 29,0 В: она зависит от нагрузки и не меняет счётчик Вт·ч. Выбор сохраняется на этом устройстве. Таймер в обоих режимах рассчитан по учтённой энергии. Максимальный разряд АКБ — 100 А, номинально 2,56 кВт при 25,6 В; доступная мощность на выходе AC ниже из-за потерь.</p><p>Штатная оценка инвертора: <button class="plain-value" data-key="inverter_percent"><span data-value="inverter_percent">—</span>%</button> · <button class="plain-value" data-key="inverter_energy"><span data-value="inverter_energy">—</span> Вт·ч</button>.</p><p>Номинальная энергия — <b>2560 Вт·ч</b>. Счётчик складывает энергию заряда и вычитает энергию разряда: мощность × время. Например, 500 Вт в течение часа — 500 Вт·ч. Напряжение и процент инвертора показаны отдельно и не пересчитывают этот остаток. Значение сохраняется на сервере и считается при закрытой панели.</p><p>После подтверждённого полного заряда остаток устанавливается в 2560 Вт·ч. Автокалибровка: напряжение достигло настройки заряда инвертора (с допуском 0,2 В), ток заряда не выше 2 А и мощность АКБ по модулю не выше 60 Вт в течение 5 минут. Это оценка полного заряда, поскольку сигнала BMS нет. Кнопку используйте только когда уверены, что аккумулятор заряжен полностью.</p><button class="calibrate" data-calibrate>АКБ полностью заряжена</button><span class="last-full" data-last-full></span><div class="toast" role="status" data-toast></div></details>
-    <footer><span>ЛОКАЛЬНЫЙ МОНИТОРИНГ</span><span data-updated>Ожидание данных</span></footer></ha-card>`;
+    <footer><span>ЛОКАЛЬНЫЙ МОНИТОРИНГ</span><span data-updated>Ожидание данных</span></footer><energetika-settings-panel></energetika-settings-panel></ha-card>`;
     root.querySelectorAll('[data-key]').forEach(el=>{
       const open = e=>{e.stopPropagation();this._moreInfo(el.dataset.key);};
       el.addEventListener('click',open);
@@ -150,11 +152,15 @@ class EnergetikaCard extends HTMLElement {
       try { localStorage.setItem('energetika.battery-mode',this._batteryMode); } catch {}
       this._update();
     }));
+    const settings=root.querySelector('energetika-settings-panel');
+    settings.configure({prefix:this.config?.settings_prefix||this._entities.mode_select.split('.')[1].replace(/output_source_priority$/,''),control:this._entities.control_mode});
+    root.querySelectorAll('[data-settings-open],[data-settings-link]').forEach(button=>button.addEventListener('click',()=>{this._closeSourceMenu(false);settings.hass=this._hass;settings.open();}));
+    settings.addEventListener('energetika-setting-pending',event=>{this._settingsPending=event.detail.pending;this._updateSourceMode();});
     root.querySelector('[data-source-open]').addEventListener('click',()=>this._toggleSourceMenu());
     root.querySelector('[data-source-close]').addEventListener('click',()=>this._closeSourceMenu());
     root.querySelector('[data-source-apply]').addEventListener('click',()=>this._applySourceMode());
     root.addEventListener('keydown',event=>{if(event.key==='Escape')this._closeSourceMenu();});
-    root.addEventListener('click',event=>{if(!event.composedPath().includes(root.querySelector('.inverter-mode')))this._closeSourceMenu(false);});
+    root.addEventListener('click',event=>{if(!event.composedPath().includes(root.querySelector('.inverter-mode')))this._closeSourceMenu(false);},true);
     root.querySelector('[data-calibrate]').addEventListener('click',()=>this._calibrate());
     this._update();
   }
@@ -169,6 +175,7 @@ class EnergetikaCard extends HTMLElement {
   _update() {
     if (!this._hass || !this.shadowRoot.firstChild) return;
     const r = this.shadowRoot, states = this._hass.states;
+    r.querySelector('energetika-settings-panel').hass=this._hass;
     this._updateSourceMode();
     r.querySelectorAll('[data-value]').forEach(el=>{
       const key=el.dataset.value,n=this._number(key);
@@ -217,9 +224,11 @@ class EnergetikaCard extends HTMLElement {
     const current=available?native.state:states[this._entities.output_priority]?.state;
     const options=Array.isArray(native?.attributes?.options)?native.attributes.options.filter(v=>typeof v==='string'):[];
     let reason='';
-    if(this._hass?.connected===false)reason='Нет соединения с Home Assistant.';
+    if(this._settingsPending)reason='Дождитесь завершения изменения в настройках.';
+    else if(this._hass?.connected===false)reason='Нет соединения с Home Assistant.';
     else if(states[this._entities.control_mode]?.state==='read_only')reason='В EyeBond Local включён режим «Только чтение». Выбор пока недоступен.';
     else if(!available)reason='Управление режимом пока недоступно в интеграции.';
+    else if(native.attributes?.editable===false||native.attributes?.policy_editable===false||native.attributes?.blocked_by_inverter)reason='Изменение сейчас заблокировано интеграцией или инвертором.';
     return {entity,current,options,reason,writable:!reason&&typeof this._hass?.callService==='function'};
   }
   _sourceCode(option) {
@@ -247,6 +256,7 @@ class EnergetikaCard extends HTMLElement {
   }
   _updateSourceMode() {
     const r=this.shadowRoot,context=this._sourceContext();
+    r.querySelector('energetika-settings-panel').externalBusy=!!this._modePending;
     r.querySelector('[data-source-current]').textContent=this._modePending?'Переключение…':this._sourceCode(context.current);
     if(this._modePending&&context.current===this._modePending.option){
       clearTimeout(this._modeTimeout);this._modePending=null;this._sourceFeedback={kind:'success',text:'Инвертор подтвердил режим '+this._sourceCode(context.current)+'.'};
@@ -258,7 +268,8 @@ class EnergetikaCard extends HTMLElement {
     const signature=JSON.stringify([rows,this._sourceDraft,context.current,!!this._modePending]);
     if(signature!==this._modeRows){
       this._modeRows=signature;
-      r.querySelector('[data-source-options]').innerHTML=rows.map((row,index)=>`<button class="source-option" data-source-index="${index}" role="option" aria-selected="${row.option===this._sourceDraft}" ${!row.enabled||this._modePending?'disabled':''}><strong>${escapeHtml(row.code)}</strong><span>${escapeHtml(row.description)}</span><span class="check">${row.option===context.current?'✓':''}</span></button>`).join('');
+      r.querySelector('[data-source-options]').innerHTML=rows.map((row,index)=>`<div class="source-row"><button class="source-option" data-source-index="${index}" aria-pressed="${row.option===this._sourceDraft}" aria-selected="${row.option===this._sourceDraft}" ${!row.enabled||this._modePending?'disabled':''}><strong>${escapeHtml(row.code)}</strong><span>${escapeHtml(row.description)}</span><span class="check">${row.option===context.current?'✓':''}</span></button><button class="source-info" data-source-info="${index}" aria-label="Справка о режиме ${escapeHtml(row.code)}">i</button></div>`).join('');
+      r.querySelectorAll('[data-source-info]').forEach(button=>button.addEventListener('click',()=>r.querySelector('energetika-settings-panel').showInfo('output_source_priority',rows[Number(button.dataset.sourceInfo)].option)));
       r.querySelectorAll('[data-source-index]').forEach(button=>button.addEventListener('click',()=>{this._sourceDraft=rows[Number(button.dataset.sourceIndex)].option;this._sourceFeedback=null;this._updateSourceMode();}));
     }
     const message=r.querySelector('[data-source-message]');
