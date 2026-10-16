@@ -15,15 +15,23 @@ template:
           {{ is_state('binary_sensor.anenji_4200_protocol_1_battery_connected', 'on')
              and has_value('sensor.anenji_4200_protocol_1_battery_voltage')
              and has_value('sensor.anenji_4200_protocol_1_battery_bulk_voltage')
+             and not is_state('binary_sensor.anenji_4200_protocol_1_battery_protection_active', 'on')
              and as_timestamp(now()) - as_timestamp(states.sensor.anenji_4200_protocol_1_battery_voltage.last_reported, 0) < 120
              and states('sensor.anenji_4200_protocol_1_battery_voltage') | float(0)
-                 >= states('sensor.anenji_4200_protocol_1_battery_bulk_voltage') | float(99) - 0.2 }}
+                 >= states('sensor.anenji_4200_protocol_1_battery_bulk_voltage') | float(99) - 0.2
+             and states('sensor.anenji_4200_protocol_1_battery_voltage') | float(99)
+                 <= states('sensor.anenji_4200_protocol_1_battery_bulk_voltage') | float(0) + 0.3 }}
         delay_on:
           minutes: 1
       - name: Energetika Battery Discharge Sustained
         unique_id: energetika_battery_discharge_sustained
         default_entity_id: binary_sensor.energetika_battery_discharge_sustained
-        state: "{{ has_value('sensor.anenji_4200_protocol_1_battery_power') and states('sensor.anenji_4200_protocol_1_battery_power') | float(0) < -30 }}"
+        # The full-charge tail permits +/-60 W. A -39 W idle reading must not
+        # cancel that same tail before its five-minute qualification completes.
+        state: >-
+          {{ has_value('sensor.anenji_4200_protocol_1_battery_power')
+             and as_timestamp(now()) - as_timestamp(states.sensor.anenji_4200_protocol_1_battery_power.last_reported, 0) < 120
+             and states('sensor.anenji_4200_protocol_1_battery_power') | float(0) < -60 }}
         delay_on:
           minutes: 1
       - name: Energetika Battery Full Qualified
@@ -37,15 +45,18 @@ template:
              and has_value('sensor.anenji_4200_protocol_1_battery_power') }}
         state: >-
           {{ is_state('binary_sensor.anenji_4200_protocol_1_battery_connected', 'on')
+             and not is_state('binary_sensor.anenji_4200_protocol_1_battery_protection_active', 'on')
              and as_timestamp(now()) - as_timestamp(states.sensor.anenji_4200_protocol_1_battery_power.last_reported, 0) < 120
              and as_timestamp(now()) - as_timestamp(states.sensor.anenji_4200_protocol_1_battery_current.last_reported, 0) < 120
              and as_timestamp(now()) - as_timestamp(states.sensor.anenji_4200_protocol_1_battery_voltage.last_reported, 0) < 120
+             and states('sensor.anenji_4200_protocol_1_battery_voltage') | float(99)
+                 <= states('sensor.anenji_4200_protocol_1_battery_bulk_voltage') | float(0) + 0.3
              and (is_state('binary_sensor.energetika_battery_absorption_seen', 'on')
                or (is_state('sensor.energetika_battery_charge_cycle', 'absorption')
                    and states('sensor.anenji_4200_protocol_1_battery_voltage') | float(0)
                      >= states('sensor.anenji_4200_protocol_1_battery_float_voltage') | float(99) - 0.1))
              and states('sensor.anenji_4200_protocol_1_battery_current') | float(99) | abs <= 2
-             and -5 <= states('sensor.anenji_4200_protocol_1_battery_power') | float(999) <= 60 }}
+             and states('sensor.anenji_4200_protocol_1_battery_power') | float(999) | abs <= 60 }}
         delay_on:
           minutes: 5
         delay_off:
@@ -73,21 +84,34 @@ template:
           {% set valid = has_value('sensor.anenji_4200_protocol_1_battery_power')
              and has_value('sensor.anenji_4200_protocol_1_battery_voltage')
              and t - as_timestamp(states.sensor.anenji_4200_protocol_1_battery_power.last_reported, 0) < 120
+             and t - as_timestamp(states.sensor.anenji_4200_protocol_1_battery_voltage.last_reported, 0) < 120
              and is_state('binary_sensor.anenji_4200_protocol_1_battery_connected', 'on') %}
-          {% if trigger.id == 'startup' or not valid
+          {% set recent = t - (this.attributes.get('absorption_at', 0) | float(0)) < 7200 %}
+          {% set settings_match = this.attributes.get('bulk_voltage') | float(0) == states('sensor.anenji_4200_protocol_1_battery_bulk_voltage') | float(-1)
+              and this.attributes.get('float_voltage') | float(0) == states('sensor.anenji_4200_protocol_1_battery_float_voltage') | float(-1) %}
+          {% if is_state('binary_sensor.anenji_4200_protocol_1_battery_connected', 'off')
               or is_state('binary_sensor.energetika_battery_discharge_sustained', 'on') %}idle
+          {% elif not valid %}
+            {{ 'absorption' if this.state == 'absorption' and recent
+                and t - (this.attributes.get('last_valid_at', 0) | float(0)) < 120 else 'idle' }}
           {% elif trigger.id == 'absorption' %}absorption
-          {% elif this.state == 'absorption'
-              and t - (this.attributes.get('absorption_at', 0) | float(0)) < 7200
+          {% elif this.state == 'absorption' and recent and settings_match
+              and t - (this.attributes.get('last_valid_at', 0) | float(0)) < 120
               and states('sensor.anenji_4200_protocol_1_battery_voltage') | float(0)
-                  >= states('sensor.anenji_4200_protocol_1_battery_float_voltage') | float(99) - 0.3
-              and this.attributes.get('bulk_voltage') | float(0) == states('sensor.anenji_4200_protocol_1_battery_bulk_voltage') | float(-1)
-              and this.attributes.get('float_voltage') | float(0) == states('sensor.anenji_4200_protocol_1_battery_float_voltage') | float(-1) %}absorption
+                  >= states('sensor.anenji_4200_protocol_1_battery_float_voltage') | float(99) - 0.3 %}absorption
           {% else %}idle{% endif %}
         attributes:
           absorption_at: "{{ as_timestamp(now()) if trigger.id == 'absorption' else this.attributes.get('absorption_at', 0) }}"
           bulk_voltage: "{{ states('sensor.anenji_4200_protocol_1_battery_bulk_voltage') if trigger.id == 'absorption' else this.attributes.get('bulk_voltage', '') }}"
           float_voltage: "{{ states('sensor.anenji_4200_protocol_1_battery_float_voltage') if trigger.id == 'absorption' else this.attributes.get('float_voltage', '') }}"
+          last_valid_at: >-
+            {{ as_timestamp(now()) if has_value('sensor.anenji_4200_protocol_1_battery_power')
+                and has_value('sensor.anenji_4200_protocol_1_battery_voltage')
+                and as_timestamp(now()) - as_timestamp(states.sensor.anenji_4200_protocol_1_battery_power.last_reported, 0) < 120
+                and as_timestamp(now()) - as_timestamp(states.sensor.anenji_4200_protocol_1_battery_voltage.last_reported, 0) < 120
+                and is_state('binary_sensor.anenji_4200_protocol_1_battery_connected', 'on')
+                else this.attributes.get('last_valid_at', 0) }}
+          tail_power_limit_w: 60
 
   - triggers:
       - trigger: state
@@ -190,6 +214,23 @@ template:
             {% endif %}
 
   - sensor:
+      - name: Energetika Battery Calibration Status
+        unique_id: energetika_battery_calibration_status
+        default_entity_id: sensor.energetika_battery_calibration_status
+        icon: mdi:battery-sync
+        state: >-
+          {% if is_state('binary_sensor.energetika_battery_full_qualified', 'on') %}Полный заряд распознан
+          {% elif not has_value('sensor.anenji_4200_protocol_1_battery_power')
+              or not has_value('sensor.anenji_4200_protocol_1_battery_voltage')
+              or not has_value('sensor.anenji_4200_protocol_1_battery_current')
+              or as_timestamp(now()) - as_timestamp(states.sensor.anenji_4200_protocol_1_battery_power.last_reported, 0) >= 120 %}Ожидает свежих показаний АКБ
+          {% elif not is_state('binary_sensor.anenji_4200_protocol_1_battery_connected', 'on') %}АКБ не подключена
+          {% elif is_state('sensor.energetika_battery_charge_cycle', 'absorption')
+              or is_state('binary_sensor.energetika_battery_absorption_seen', 'on') %}
+            {% if states('sensor.anenji_4200_protocol_1_battery_power') | float(999) | abs > 60
+                or states('sensor.anenji_4200_protocol_1_battery_current') | float(99) | abs > 2 %}Верхнее напряжение достигнуто; ожидает малого тока
+            {% else %}Малый ток после верхнего напряжения; подтверждение 5 минут{% endif %}
+          {% else %}Ожидает верхнего напряжения ≥ {{ (states('sensor.anenji_4200_protocol_1_battery_bulk_voltage') | float(29) - 0.2) | round(1) }} В{% endif %}
       - name: Energetika Battery Percent Voltage
         unique_id: energetika_battery_percent_voltage
         default_entity_id: sensor.energetika_battery_percent_voltage

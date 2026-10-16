@@ -6,7 +6,8 @@ import yaml
 from jinja2 import Environment
 
 config = yaml.safe_load(Path('energetika.yaml').read_text(encoding='utf-8'))
-sensor = config['template'][1]['sensor'][0]
+sensor = next(sensor for block in config['template'] for sensor in block.get('sensor', [])
+              if sensor.get('unique_id') == 'energetika_battery_remaining')
 env = Environment()
 env.globals['as_timestamp'] = lambda value, default=0: value.timestamp() if hasattr(value, 'timestamp') else default
 now = datetime.now(timezone.utc)

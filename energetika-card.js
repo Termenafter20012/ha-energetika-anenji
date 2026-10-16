@@ -1,6 +1,6 @@
-import './energetika-history.js?v=2.5.0';
-import './energetika-settings.js?v=2.5.0';
-import './energetika-automation.js?v=2.5.0';
+import './energetika-history.js?v=2.5.1';
+import './energetika-settings.js?v=2.5.1';
+import './energetika-automation.js?v=2.5.1';
 
 export function formatRuntime(minutes) {
   if (!Number.isFinite(minutes) || minutes < 0) return '—';
@@ -34,6 +34,7 @@ const ENTITIES = {
   battery_load: ROOT + 'battery_to_home_power', charge: 'sensor.zariadka_akb',
   discharge: 'sensor.razriadka_akb', battery_power: ROOT + 'battery_power',
   current: ROOT + 'battery_current', used: 'sensor.energetika_battery_used',
+  calibration_status: 'sensor.energetika_battery_calibration_status',
 };
 const ICONS = {
   sun: '<circle cx="24" cy="24" r="9"/><path d="M24 2v7m0 30v7M2 24h7m30 0h7M8.5 8.5l5 5m21 21 5 5m0-31-5 5m-21 21-5 5"/>',
@@ -143,7 +144,7 @@ class EnergetikaCard extends HTMLElement {
     </div>
 
     <div class="note">Стрелки движутся в направлении передачи энергии. Ток сети ≈ P/U (оценка активного тока). Таймер — по текущему разряду до резерва 20%, при смене нагрузки пересчитывается. Распределение потоков — расчёт интеграции инвертора; разница с нагрузкой может включать потери и собственное потребление.</div>
-    <details><summary>Об аккумуляторе <span class="main-status" data-main-status></span></summary><div class="calibration" data-calibration></div><p>Режим «Энергия» — остаток по мощности и времени. Режим «По напряжению» — линейная оценка от нижнего порога автономной работы до 29,0 В: она зависит от нагрузки и не меняет счётчик Вт·ч. Выбор сохраняется на этом устройстве. Таймер в обоих режимах рассчитан по учтённой энергии. Максимальный разряд АКБ — 100 А, номинально 2,56 кВт при 25,6 В; доступная мощность на выходе AC ниже из-за потерь.</p><p>Штатная оценка инвертора: <button class="plain-value" data-key="inverter_percent"><span data-value="inverter_percent">—</span>%</button> · <button class="plain-value" data-key="inverter_energy"><span data-value="inverter_energy">—</span> Вт·ч</button>.</p><p>Номинальная энергия — <b>2560 Вт·ч</b>. Счётчик складывает энергию заряда и вычитает энергию разряда: мощность × время. Например, 500 Вт в течение часа — 500 Вт·ч. Напряжение и процент инвертора показаны отдельно и не пересчитывают этот остаток. Значение сохраняется на сервере и считается при закрытой панели.</p><p>После подтверждённого полного заряда остаток устанавливается в 2560 Вт·ч. Автокалибровка: верхнее напряжение держалось минуту, затем малый чистый ток (до 2 А) и мощность от −5 до 60 Вт держатся 5 минут. Поддерживающее напряжение учитывается только после верхнего в том же цикле, без устойчивого разряда и перерыва связи. Один малый ток при 27,2 В не подтверждает полный заряд. Полоска всегда показывает оставшиеся Вт·ч из 2560, в обоих режимах. Это оценка полного заряда, поскольку сигнала BMS нет. Кнопку используйте только когда уверены, что аккумулятор заряжен полностью.</p><button class="calibrate" data-calibrate>АКБ полностью заряжена</button><span class="last-full" data-last-full></span><div class="toast" role="status" data-toast></div></details>
+    <details><summary>Об аккумуляторе <span class="main-status" data-main-status></span></summary><div class="calibration" data-calibration></div><p>Режим «Энергия» — остаток по мощности и времени. Режим «По напряжению» — линейная оценка от нижнего порога автономной работы до 29,0 В: она зависит от нагрузки и не меняет счётчик Вт·ч. Выбор сохраняется на этом устройстве. Таймер в обоих режимах рассчитан по учтённой энергии. Максимальный разряд АКБ — 100 А, номинально 2,56 кВт при 25,6 В; доступная мощность на выходе AC ниже из-за потерь.</p><p>Штатная оценка инвертора: <button class="plain-value" data-key="inverter_percent"><span data-value="inverter_percent">—</span>%</button> · <button class="plain-value" data-key="inverter_energy"><span data-value="inverter_energy">—</span> Вт·ч</button>.</p><p>Номинальная энергия — <b>2560 Вт·ч</b>. Счётчик складывает энергию заряда и вычитает энергию разряда: мощность × время. Например, 500 Вт в течение часа — 500 Вт·ч. Напряжение и процент инвертора показаны отдельно и не пересчитывают этот остаток. Значение сохраняется на сервере и считается при закрытой панели.</p><p>После подтверждённого полного заряда остаток устанавливается в 2560 Вт·ч. Автокалибровка: верхнее напряжение держалось минуту, затем малый чистый ток (до 2 А) и мощность по модулю до 60 Вт держатся 5 минут. Поддерживающее напряжение учитывается только после верхнего в том же цикле, без устойчивого разряда мощнее 60 Вт. Малый ток может быть положительным или отрицательным: например, −1,4 А и −39 Вт после заряда не сбрасывают ожидание. Потеря свежих данных более 2 минут, отключение АКБ или изменение Bulk/Float отменяют сохранённый признак. Один малый ток при 27,2 В не подтверждает полный заряд. Полоска всегда показывает оставшиеся Вт·ч из 2560, в обоих режимах. Это оценка полного заряда, поскольку сигнала BMS нет. Кнопку используйте только когда уверены, что аккумулятор заряжен полностью.</p><button class="calibrate" data-calibrate>АКБ полностью заряжена</button><span class="last-full" data-last-full></span><p class="last-full" data-calibration-status role="status"></p><div class="toast" role="status" data-toast></div></details>
     <energetika-automation-panel></energetika-automation-panel><footer><span>ЛОКАЛЬНЫЙ МОНИТОРИНГ</span><span data-updated>Ожидание данных</span></footer><energetika-settings-panel></energetika-settings-panel></ha-card>`;
     root.querySelectorAll('[data-key]').forEach(el=>{
       const open = e=>{e.stopPropagation();this._moreInfo(el.dataset.key);};
@@ -223,6 +224,8 @@ class EnergetikaCard extends HTMLElement {
     r.querySelector('[data-main-status]').textContent=uncalibrated?'Нужен полный заряд':gap?'Есть перерыв в учёте':'';
     message.textContent=uncalibrated?'Счётчик Вт·ч ожидает первого полного заряда. Он запустится после автокалибровки; если АКБ уже полная, подтвердите это кнопкой ниже.':gap?'Во время учёта был перерыв в данных. Остаток сохранён, но может быть неточным до следующего полного заряда.':'';
     const last=energy?.attributes?.last_full;
+    const calibration=states[this._entities.calibration_status]?.state;
+    r.querySelector('[data-calibration-status]').textContent=calibration&&!['unknown','unavailable'].includes(calibration)?'Автокалибровка: '+calibration+'.':'';
     r.querySelector('[data-last-full]').textContent=last?`Последний полный заряд: ${new Date(last).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}`:'Полный заряд ещё не подтверждён';
     const updated=states[this._entities.load]?.last_updated;
     r.querySelector('[data-updated]').textContent=updated?`Данные · ${new Date(updated).toLocaleTimeString('ru-RU')}`:'Ожидание данных';
