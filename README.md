@@ -7,9 +7,11 @@
 
 [Меню режимів UTI / SOL / SBU / SUB / SUF](docs/screenshots/mode-menu.jpg)
 
-[Шестерня на схемі](docs/screenshots/settings-entry.jpg) · [Налаштування інвертора російською](docs/screenshots/settings.jpg) · [Довідка про режими](docs/screenshots/settings-info.jpg)
+[Блокування частоти](docs/screenshots/frequency-locked.jpg) · [Перевірка порогів АКБ](docs/screenshots/voltage-constraint.jpg) · [Шестерня на схемі](docs/screenshots/settings-entry.jpg) · [Налаштування інвертора російською](docs/screenshots/settings.jpg) · [Довідка про режими](docs/screenshots/settings-info.jpg)
 
 ## Можливості
+
+- Частота виходу — тільки для перегляду; зміна заборонена і на сервері. Пов’язані пороги АКБ та струми перевіряються до запису. Неповне підтвердження запису перевіряється читанням регістра без повторної команди.
 
 - Шестерня відкриває доступні налаштування інвертора: зрозумілі російські назви або вихідні назви, пошук, розділи та i з поясненнями параметрів і режимів. Кожний запис підтверджується окремо; значення чекає відповіді інвертора.
 - Меню режимів **UTI, SOL, SBU, SUB, SUF** над вузлом мережі: вибір, підтвердження та очікування відповіді інвертора. Потрібне окремо ввімкнене керування EyeBond Local.
@@ -69,7 +71,7 @@ Home Assistant 2026.10, EyeBond Local **0.1.53**, драйвер `modbus_smg`, �
 
 Повні кроки, відповідність сутностей, оновлення і відкат — у **[docs/INSTALL.uk.md](docs/INSTALL.uk.md)**.
 
-Скопіюйте `energetika.yaml` до каталогу конфігурації HA, три JS-файли (`energetika-card.js`, `energetika-history.js`, `energetika-settings.js`) — до `www`, додайте пакет у `homeassistant.packages`, додайте ресурс `/local/energetika-card.js?v=2.4.1` типу JavaScript module і вставте `dashboard-energetika.yaml` у текстовий редактор окремої панелі. Не замінюйте власний `configuration.yaml` цілком.
+Скопіюйте `energetika.yaml` до каталогу конфігурації HA, три JS-файли (`energetika-card.js`, `energetika-history.js`, `energetika-settings.js`) — до `www`, додайте пакет у `homeassistant.packages`, додайте ресурс `/local/energetika-card.js?v=2.4.2` типу JavaScript module і вставте `dashboard-energetika.yaml` у текстовий редактор окремої панелі. Не замінюйте власний `configuration.yaml` цілком.
 
 Для сумісного драйвера використайте `patches/install_guard.py`. Самостійний офлайн-інсталятор цієї конкретної конфігурації збирається командою `python build_deploy.py` у `.deploy/install_energetika_v2.py`. Перед застосуванням на іншому обладнанні адаптуйте всі сутності, ємність і межі.
 

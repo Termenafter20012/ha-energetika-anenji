@@ -98,13 +98,14 @@ class EnergetikaSettingsPanel extends HTMLElement {
     return this._option(value);
   }
   _reason(s) {
+    if(s?.attributes.key==='output_rating_frequency')return 'Изменение частоты запрещено владельцем. Только просмотр.';
     if(!this._hass || this._hass.connected===false)return 'Нет соединения с Home Assistant.';
     if(this._externalBusy)return 'Дождитесь подтверждения переключения режима питания.';
     if(!s || ['unknown','unavailable',''].includes(s.state)||!this._hass.states[s.entity_id]?.attributes?.key)return 'Нет свежего значения от инвертора.';
     const control=this._hass.states[this._control]?.state;
     if(control!=='full')return 'Для изменения нужен режим «Полный контроль» в EyeBond Local.';
     const a=s.attributes;
-    if(a.blocked_by_inverter)return 'Инвертор заблокировал изменение этого параметра.';
+    if(a.blocked_by_inverter)return this._errorText(a.blocked_reason||'Инвертор заблокировал изменение этого параметра.');
     if(a.visible===false||a.editable===false||a.policy_editable===false)return 'Изменение сейчас запрещено интеграцией.';
     return '';
   }
@@ -119,9 +120,37 @@ class EnergetikaSettingsPanel extends HTMLElement {
     if(step>0&&Math.abs((n-base)/step-Math.round((n-base)/step))>0.00001)return null;
     return n;
   }
+  _parameterNumber(key) {
+    const id=[...this._catalog.keys()].find(id=>this._catalog.get(id).key===key);
+    const s=id&&this._hass?.states[id];
+    if(!s||['unknown','unavailable',''].includes(s.state))return null;
+    const n=Number(s.state);return Number.isFinite(n)?n:null;
+  }
+  _validation(s,value) {
+    if(value===null)return 'Введите значение в допустимом диапазоне и с указанным шагом.';
+    const rules={
+      battery_under_voltage_off_grid:['battery_under_voltage','lt','Нижний порог без сети должен быть минимум на 0,1 В ниже порога перехода на сеть.'],
+      battery_under_voltage:['battery_under_voltage_off_grid','gt','Порог перехода на сеть должен быть минимум на 0,1 В выше автономного отключения.'],
+      battery_float_voltage:['battery_bulk_voltage','le','Поддерживающее напряжение не должно превышать основное.'],
+      battery_bulk_voltage:['battery_float_voltage','ge','Основное напряжение заряда не должно быть ниже поддерживающего.'],
+      max_ac_charge_current:['max_charge_current','le','Ток заряда от сети не должен превышать общий ток заряда.'],
+      max_charge_current:['max_ac_charge_current','ge','Общий ток заряда не должен быть ниже ограничения заряда от сети.'],
+    };
+    const rule=rules[s.attributes.key];if(!rule||this._prefix!=='anenji_4200_protocol_1_')return '';
+    const other=this._parameterNumber(rule[0]);if(other===null)return 'Нет свежего значения связанного параметра. Дождитесь восстановления данных.';
+    const n=Number(value),ok={lt:n<=other-0.1+0.00001,gt:n>=other+0.1-0.00001,le:n<=other+0.00001,ge:n>=other-0.00001}[rule[1]];
+    return ok?'':rule[2]+' Связанный параметр сейчас: '+other.toLocaleString('ru-RU')+'.';
+  }
+  _errorText(error) {
+    const text=String(error?.message||error||'');
+    if(/illegal_data_value|exception_code:3/.test(text))return 'Инвертор отклонил значение. Проверьте связанные пороги и тип АКБ в его меню.';
+    if(/response_too_short|crc_mismatch|request_timeout|write_not_confirmed|collector_|unexpected_length/.test(text))return 'Не удалось подтвердить запись по связи. Проверьте поле «Сейчас» перед повтором.';
+    return /[А-Яа-яЁё]/.test(text)?text:'Инвертор не подтвердил изменение. Проверьте связь и ограничения параметра.';
+  }
   _same(s,v) { return s.entity_id.startsWith('number.')?Math.abs(Number(s.state)-Number(v))<0.00001:s.state===v; }
   _range(s) {
     const a=s.attributes;
+    if(a.key==='output_rating_frequency')return 'Только просмотр · изменение частоты запрещено';
     if(!s.entity_id.startsWith('number.'))return '';
     const span=finite(a.minimum)&&finite(a.maximum)?`${a.minimum}–${a.maximum}`:finite(a.minimum)?`от ${a.minimum}`:finite(a.maximum)?`до ${a.maximum}`:'';
     return span?`Диапазон интеграции: ${span} ${unit(a.unit)} · шаг ${a.step||1}`:`Шаг ${a.step||0.1} ${unit(a.unit)} · точные пределы задаёт прошивка`;
@@ -165,11 +194,16 @@ class EnergetikaSettingsPanel extends HTMLElement {
       const s=this._state(id);
       row.querySelector('.current strong').textContent=this._display(s);
       if(!this._drafts.has(id)&&this.shadowRoot.activeElement!==input)input.value=s.state;
-      const reason=this._reason(s),v=this._value(s,input.value),changed=v!==null&&!this._same(s,v),pending=!!this._pending;
-      input.disabled=!!reason||pending; row.querySelector('.save').disabled=!!reason||pending||!changed;
+      const reason=this._reason(s),v=this._value(s,input.value),validation=this._validation(s,v),changed=v!==null&&!this._same(s,v),pending=!!this._pending;
+      input.disabled=!!reason||pending; row.querySelector('.save').disabled=!!reason||pending||!changed||!!validation;
+      row.querySelector('.save').textContent=s.attributes.key==='output_rating_frequency'?'Запрещено':'Сохранить';
+      if(s.attributes.key==='battery_under_voltage_off_grid'){
+        const upper=this._parameterNumber('battery_under_voltage');
+        if(upper!==null){input.max=(upper-0.1).toFixed(1);row.querySelector('.range').textContent=`Шаг 0,1 В · максимум сейчас ${Number(input.max).toLocaleString('ru-RU')} В (с учётом порога перехода на сеть)`;}
+      }
       const feedback=this._feedback.get(id),status=row.querySelector('.status');
       status.className='status '+(feedback?.kind||'');
-      status.textContent=this._pending?.id===id?'Ожидание ответа инвертора…':reason||feedback?.text||(this._drafts.has(id)&&v===null?'Введите значение в допустимом диапазоне и с указанным шагом.':'');
+      status.textContent=this._pending?.id===id?(this._pending.recovering?'Проверяю фактическое значение после сбоя связи…':'Ожидание ответа инвертора…'):reason||feedback?.text||(this._drafts.has(id)?validation:'');
     }
   }
   showInfo(key,option) {
@@ -181,7 +215,7 @@ class EnergetikaSettingsPanel extends HTMLElement {
   }
   _review(id) {
     const s=this._hass?.states[id],ref=this._rows.get(id);if(!s||!ref||this._pending||this._reason(s))return;
-    const value=this._value(s,ref.input.value);if(value===null||this._same(s,value))return;
+    const value=this._value(s,ref.input.value);if(value===null||this._same(s,value)||this._validation(s,value))return;
     const warnings=(s.attributes.warnings||[]).map(w=>WARNINGS[w]||'У интеграции есть дополнительное условие для изменения. '+w);
     if(s.attributes.reboot_required)warnings.push('Для вступления в силу может потребоваться перезапуск инвертора.');
     const review=this.shadowRoot.querySelector('.review');
@@ -192,16 +226,22 @@ class EnergetikaSettingsPanel extends HTMLElement {
   async _apply(id,value,oldState) {
     const s=this._hass?.states[id];if(!s||this._pending)return;
     // Recheck the live state and policy after the review dialog, before any write.
-    if(this._reason(s)||s.state!==oldState||this._value(s,value)===null){this._feedback.set(id,{kind:'error',text:'Параметр или доступ изменился. Проверьте значение и подтвердите заново.'});this._sync();return;}
-    const operation={id,value,accepted:false};this._pending=operation;this._feedback.delete(id);this._sync();
+    if(this._reason(s)||s.state!==oldState||this._value(s,value)===null||this._validation(s,value)){this._feedback.set(id,{kind:'error',text:'Параметр или доступ изменился. Проверьте значение и подтвердите заново.'});this._sync();return;}
+    const operation={id,value,accepted:false,started:Date.now()};this._pending=operation;this._feedback.delete(id);this._sync();
     this.dispatchEvent(new CustomEvent('energetika-setting-pending',{detail:{pending:true},bubbles:true,composed:true}));
-    this._timeout=setTimeout(()=>this._finish(operation,{kind:'error',text:'Подтверждение не получено. Проверьте фактическое значение перед повторной отправкой.'}),20000);
+    const waitForReadback=()=>{if(this._pending===operation)this._timeout=setTimeout(()=>this._finish(operation,{kind:'error',text:'Подтверждение не получено. Проверьте фактическое значение перед повторной отправкой.'}),20000);};
     const domain=id.split('.')[0],service=domain==='number'?'set_value':domain==='select'?'select_option':value==='on'?'turn_on':'turn_off';
     const data={entity_id:id,...(domain==='number'?{value}:domain==='select'?{option:value}:{})};
-    try {await this._hass.callService(domain,service,data);if(this._pending!==operation)return;operation.accepted=true;this._settle();}
-    catch(error){this._finish(operation,{kind:'error',text:'Изменение не подтверждено. '+String(error?.message||'Проверьте связь и условия изменения.')});}
+    try {await this._hass.callService(domain,service,data);if(this._pending!==operation)return;operation.accepted=true;this._settle();waitForReadback();}
+    catch(error){
+      if(this._pending!==operation)return;
+      const message=String(error?.message||error||'');
+      if(/response_too_short|crc_mismatch|request_timeout|write_not_confirmed|collector_|unexpected_length|Не удалось подтвердить запись по связи/.test(message)){
+        operation.accepted=true;operation.recovering=true;this._settle();this._sync();waitForReadback();
+      }else this._finish(operation,{kind:'error',text:this._errorText(error)});
+    }
   }
-  _settle() {const p=this._pending,s=p&&this._hass?.states[p.id];if(p?.accepted&&s&&this._same(s,p.value))this._finish(p,{kind:'success',text:'Инвертор подтвердил значение.'});}
+  _settle() {const p=this._pending,s=p&&this._hass?.states[p.id];if(p?.accepted&&s&&this._same(s,p.value)&&(!p.recovering||Date.parse(s.last_updated)>=p.started))this._finish(p,{kind:'success',text:p.recovering?'Фактическое значение подтверждено после сбоя связи.':'Инвертор подтвердил значение.'});}
   _finish(operation,feedback) {
     if(this._pending!==operation)return;clearTimeout(this._timeout);this._pending=null;this._feedback.set(operation.id,feedback);
     if(feedback.kind==='success')this._drafts.delete(operation.id);this._sync();

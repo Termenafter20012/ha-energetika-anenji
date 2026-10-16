@@ -1,5 +1,5 @@
-import './energetika-history.js?v=2.4.1';
-import './energetika-settings.js?v=2.4.1';
+import './energetika-history.js?v=2.4.2';
+import './energetika-settings.js?v=2.4.2';
 
 export function formatRuntime(minutes) {
   if (!Number.isFinite(minutes) || minutes < 0) return '—';

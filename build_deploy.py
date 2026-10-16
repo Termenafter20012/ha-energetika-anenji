@@ -4,7 +4,7 @@ import base64
 import json
 import zlib
 
-files = {name:Path(name).read_text(encoding='utf-8') for name in ['energetika.yaml','energetika-card.js','energetika-history.js','energetika-settings.js','patches/install_guard.py','patches/telemetry_guard.py','patches/install_modes.py']}
+files = {name:Path(name).read_text(encoding='utf-8-sig') for name in ['energetika.yaml','energetika-card.js','energetika-history.js','energetika-settings.js','patches/install_guard.py','patches/telemetry_guard.py','patches/install_modes.py','patches/install_controls.py','patches/control_guard.py']}
 payload=base64.b64encode(zlib.compress(json.dumps(files,ensure_ascii=False).encode(),9)).decode()
 source='''"""Offline Energetika v2 installer. Back up first; no inverter commands."""
 from pathlib import Path
@@ -22,7 +22,7 @@ def main():
     files=json.loads(zlib.decompress(base64.b64decode(PAYLOAD)))
     stage=root/'energetika-install-v2'
     stage.mkdir(exist_ok=True)
-    for name in ['install_guard.py','telemetry_guard.py','install_modes.py']:
+    for name in ['install_guard.py','telemetry_guard.py','install_modes.py','install_controls.py','control_guard.py']:
         (stage/name).write_text(files['patches/'+name],encoding='utf-8')
     spec=importlib.util.spec_from_file_location('install_guard',stage/'install_guard.py')
     module=importlib.util.module_from_spec(spec)
@@ -32,6 +32,10 @@ def main():
     mode_module=importlib.util.module_from_spec(mode_spec)
     mode_spec.loader.exec_module(mode_module)
     mode_module.install(root)
+    control_spec=importlib.util.spec_from_file_location('install_controls',stage/'install_controls.py')
+    control_module=importlib.util.module_from_spec(control_spec)
+    control_spec.loader.exec_module(control_module)
+    control_module.install(root)
     backup=root/('energetika-ui-backup-'+datetime.now(timezone.utc).strftime('%%Y%%m%%dT%%H%%M%%SZ'))
     backup.mkdir()
     for name,destination in [('energetika.yaml','energetika.yaml'),('energetika-card.js','www/energetika-card.js'),('energetika-history.js','www/energetika-history.js'),('energetika-settings.js','www/energetika-settings.js')]:
@@ -46,7 +50,7 @@ def main():
         temporary.write_text(files[name],encoding='utf-8')
         temporary.replace(path)
     print('UI and YAML installed; backup:',backup)
-    print('Restart Home Assistant; update resource URL to /local/energetika-card.js?v=2.4.1')
+    print('Restart Home Assistant; update resource URL to /local/energetika-card.js?v=2.4.2')
 if __name__=='__main__': main()
 ''' % payload
 Path('.deploy').mkdir(exist_ok=True)
