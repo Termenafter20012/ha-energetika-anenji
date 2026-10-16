@@ -7,6 +7,91 @@ input_button:
     icon: mdi:battery-check
 
 template:
+  # Persistent SMG alarm episodes. Missing data never resolves an alarm.
+  # Keep up to 100 episodes, prioritising all open ones (at most 64 mask bits).
+  # Compact timestamps keep attributes below Recorder's 16 KiB limit.
+  - triggers:
+      - trigger: state
+        entity_id:
+          - sensor.anenji_4200_protocol_1_fault_code
+          - sensor.anenji_4200_protocol_1_warning_code
+        id: masks
+      - trigger: time_pattern
+        seconds: "/30"
+        id: freshness
+      - trigger: homeassistant
+        event: start
+        id: startup
+      - trigger: event
+        event_type: energetika_alarm_journal
+        id: journal
+    variables:
+      alarm_now: "{{ as_timestamp(now()) | int }}"
+      alarm_event_id: "{{ (as_timestamp(now()) * 1000000) | int }}"
+      alarm_fault: "{{ states('sensor.anenji_4200_protocol_1_fault_code') | int(-1) }}"
+      alarm_warning: "{{ states('sensor.anenji_4200_protocol_1_warning_code') | int(-1) }}"
+      alarm_fresh_f: >-
+        {{ 0 <= alarm_fault <= 4294967295
+           and as_timestamp(now()) - as_timestamp(states.sensor.anenji_4200_protocol_1_fault_code.last_reported, 0) < 120 }}
+      alarm_fresh_w: >-
+        {{ 0 <= alarm_warning <= 4294967295
+           and as_timestamp(now()) - as_timestamp(states.sensor.anenji_4200_protocol_1_warning_code.last_reported, 0) < 120 }}
+      alarm_operation: "{{ trigger.event.data.get('operation', '') if trigger.id == 'journal' else '' }}"
+      alarm_entry_id: "{{ trigger.event.data.get('entry_id', '') if trigger.id == 'journal' else '' }}"
+    sensor:
+      - name: Energetika Inverter Alerts
+        unique_id: energetika_inverter_alerts
+        default_entity_id: sensor.energetika_inverter_alerts
+        icon: mdi:alert-outline
+        state: >-
+          {% set ns = namespace(count=0) %}
+          {% for mask in [alarm_fault, alarm_warning] if mask >= 0 %}
+            {% for bit in range(32) %}
+              {% if mask | bitwise_and(2 ** bit) %}{% set ns.count = ns.count + 1 %}{% endif %}
+            {% endfor %}
+          {% endfor %}
+          {{ ns.count }}
+        attributes:
+          monitoring_since: "{{ this.attributes.get('monitoring_since', alarm_now) }}"
+          checked_at: "{{ alarm_now }}"
+          fault_fresh: "{{ alarm_fresh_f }}"
+          warning_fresh: "{{ alarm_fresh_w }}"
+          fault_mask: "{{ alarm_fault }}"
+          warning_mask: "{{ alarm_warning }}"
+          entries: >-
+            {% set ns = namespace(rows=[], open_keys=[]) %}
+            {% for old in this.attributes.get('entries', []) %}
+              {% set mask = alarm_fault if old.kind == 'fault' else alarm_warning %}
+              {% set fresh = alarm_fresh_f if old.kind == 'fault' else alarm_fresh_w %}
+              {% set ended = old.ended %}
+              {% if not ended and fresh and not (mask | bitwise_and(2 ** old.bit)) %}
+                {% set ended = alarm_now %}
+              {% endif %}
+              {% set acknowledged = old.acknowledged %}
+              {% set deleted = old.deleted %}
+              {% if old.id == alarm_entry_id %}
+                {% if alarm_operation == 'ack' %}{% set acknowledged = alarm_now %}{% endif %}
+                {% if alarm_operation == 'hide' and ended %}{% set deleted = alarm_now %}{% endif %}
+                {% if alarm_operation == 'restore' %}{% set deleted = 0 %}{% endif %}
+              {% endif %}
+              {% set ns.rows = ns.rows + [dict(old, ended=ended, acknowledged=acknowledged, deleted=deleted)] %}
+              {% if not ended %}{% set ns.open_keys = ns.open_keys + [old.kind ~ ':' ~ old.bit] %}{% endif %}
+            {% endfor %}
+            {% for kind, mask, fresh in [('fault', alarm_fault, alarm_fresh_f), ('warning', alarm_warning, alarm_fresh_w)] %}
+              {% if fresh %}
+                {% for bit in range(32) %}
+                  {% if mask | bitwise_and(2 ** bit) and (kind ~ ':' ~ bit) not in ns.open_keys %}
+                    {% set ns.rows = ns.rows + [dict(id=kind[0] ~ bit ~ ':' ~ alarm_event_id, kind=kind, bit=bit,
+                       started=alarm_now, ended=0, acknowledged=0, deleted=0)] %}
+                  {% endif %}
+                {% endfor %}
+              {% endif %}
+            {% endfor %}
+            {% set completed = ns.rows | rejectattr('ended', 'eq', 0) | list %}
+            {% set active = ns.rows | selectattr('ended', 'eq', 0) | list %}
+            {% set slots = 100 - (active | count) %}
+            {{ (completed[-slots:] if slots > 0 else []) + active }}
+
   - binary_sensor:
       - name: Energetika Battery Absorption Seen
         unique_id: energetika_battery_absorption_seen
@@ -579,6 +664,30 @@ input_text:
     max: 255
 
 script:
+  energetika_alarm_journal:
+    alias: "Энергетика · Запись журнала ошибок"
+    description: "Отметить, скрыть или восстановить запись. Команд инвертору не отправляет."
+    mode: queued
+    max: 20
+    fields:
+      operation:
+        required: true
+        selector:
+          select:
+            options: [ack, hide, restore]
+      entry_id:
+        required: true
+        selector:
+          text:
+    sequence:
+      - condition: template
+        value_template: >-
+          {{ operation in ['ack', 'hide', 'restore']
+             and entry_id in ((state_attr('sensor.energetika_inverter_alerts', 'entries') or []) | map(attribute='id') | list) }}
+      - event: energetika_alarm_journal
+        event_data:
+          operation: "{{ operation }}"
+          entry_id: "{{ entry_id }}"
   energetika_solar_pause:
     alias: "Энергетика · Пауза автоматики на час"
     mode: restart
