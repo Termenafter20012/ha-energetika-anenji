@@ -1,4 +1,4 @@
-import './energetika-history.js?v=2.2.2';
+import './energetika-history.js?v=2.3.0';
 
 export function formatRuntime(minutes) {
   if (!Number.isFinite(minutes) || minutes < 0) return '—';
@@ -7,11 +7,21 @@ export function formatRuntime(minutes) {
 }
 /* Energetika 2.2 — local Home Assistant card, no external dependencies. */
 const ROOT = 'sensor.anenji_4200_protocol_1_';
+const SOURCE_MODES = [
+  {code:'UTI', option:'Utility First (UTI)', description:'Сеть в приоритете'},
+  {code:'SOL', option:'Solar First (SOL)', description:'Солнце в приоритете'},
+  {code:'SBU', option:'Solar-Battery-Utility (SBU)', description:'Солнце → АКБ → сеть'},
+  {code:'SUB', option:'Solar-Utility-Battery (SUB)', description:'Солнце → сеть → АКБ'},
+  {code:'SUF', option:'Solar-Utility-Feed (SUF)', description:'Солнце + сеть · возможна отдача в сеть'},
+];
+const escapeHtml = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ENTITIES = {
   grid_voltage: ROOT + 'grid_voltage', grid_current: 'sensor.energetika_grid_current_estimate',
   solar_voltage: ROOT + 'pv_voltage', solar_current: ROOT + 'pv_current',
   load_voltage: ROOT + 'output_voltage', load_current: ROOT + 'output_current',
   runtime: 'sensor.energetika_battery_runtime_to_reserve',
+  mode_select: 'select.anenji_4200_protocol_1_output_source_priority',
+  output_priority: ROOT + 'output_source_priority', control_mode: ROOT + 'control_mode',
   grid: ROOT + 'grid_power', solar: ROOT + 'pv_power', load: ROOT + 'load_power',
   battery: 'sensor.energetika_battery_remaining', percent: 'sensor.energetika_battery_percent_energy',
   voltage: ROOT + 'battery_voltage', voltage_min: ROOT + 'battery_under_voltage_off_grid',
@@ -52,6 +62,7 @@ class EnergetikaCard extends HTMLElement {
   getGridOptions() { return {columns: 12, min_columns: 6}; }
   set hass(hass) { this._hass = hass; this._update(); }
   connectedCallback() { if (!this.shadowRoot.firstChild) this._render(); }
+  disconnectedCallback() { clearTimeout(this._modeTimeout); }
   _node(key, name, ic, x, y, w, color, unit = 'Вт') {
     return `<g class="node ${color}" data-key="${key}" role="button" tabindex="0" aria-label="${name}: открыть историю" transform="translate(${x} ${y})">
       <rect class="node-bg" width="${w}" height="${key === 'battery' ? 132 : 112}" rx="16"/>
@@ -86,8 +97,11 @@ class EnergetikaCard extends HTMLElement {
       @media(max-width:520px){.shell{padding:11px 9px 8px;border-radius:19px}.tiles{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.tile{position:relative;padding:7px 6px;min-height:59px;border-radius:12px;display:block}.tile>.icon{position:absolute;width:18px;height:21px;left:7px;bottom:9px}.tile-body{gap:6px}.tile-title{font-size:9px;line-height:1.2;white-space:nowrap;color:#adc4d3}.tile-body strong{font-size:20px;padding-left:22px;line-height:1.1}.tile-body strong.long-value{font-size:16px}.unit{margin-left:2px}.diagram{margin:0 auto;width:100%;max-height:255px}.section-label{font-size:8px;margin:1px 2px 6px;letter-spacing:1.3px}h1{font-size:21px}.eyebrow{font-size:7px;letter-spacing:1.5px}.live{font-size:9px}.battery-summary{display:block;grid-column:1/-1;grid-row:4;padding:9px 10px;border-radius:13px;min-height:0}.battery-top{margin-bottom:6px;gap:4px}.battery-title{font-size:11px;gap:4px}.battery-title .icon{width:15px;height:19px}.nameplate{font-size:8px;margin-left:2px}.mode-switch button{font-size:9px;padding:4px 6px}.battery-layout{grid-template-columns:1.35fr .75fr .8fr;gap:8px}.battery-main .plain-value strong{font-size:26px}.battery-main .capacity{font-size:8px;margin-top:1px}.battery-layout .mini>span{font-size:8px}.battery-layout .mini strong{font-size:18px}.voltage-limits{margin-top:7px;font-size:9px;gap:7px}.battery-bottom{margin-top:6px;font-size:8px;gap:4px}.battery-bottom .runtime{font-size:9px}.battery-spec{font-size:8px}.note{display:none}details{margin-top:7px;padding-top:4px;font-size:10px}summary::after{font-size:15px}footer{display:none}.calibration{font-size:9px;line-height:1.3;padding:4px 7px;margin-top:5px}.last-full{display:block;margin:8px 0}.main-status{font-size:8px}}
       @media(max-width:365px){.shell{padding:8px 7px}.tile-title{font-size:8px}.tile-body strong{font-size:18px}.tile{min-height:55px}.diagram{max-height:225px}.nameplate{font-size:7px}.mode-switch button{padding:4px;font-size:8px}.battery-main .plain-value strong{font-size:23px}.battery-layout .mini strong{font-size:16px}.battery-title{font-size:10px}.battery-spec{font-size:7px}.battery-layout{gap:5px}.battery-bottom .runtime{font-size:8px}}
       @media(max-width:520px) and (max-height:740px){.shell{padding-top:8px}.diagram{max-height:200px}.tile{min-height:52px;padding:6px}.tile-body{gap:4px}.battery-summary{padding:8px 9px}.battery-top{margin-bottom:4px}.voltage-limits{margin-top:5px}.battery-bottom{margin-top:4px}.calibration{font-size:8px}}
+      .diagram-wrap{position:relative}.inverter-mode{position:absolute;left:5px;top:8px;z-index:4}.source-trigger{display:flex;align-items:center;gap:9px;border:1px solid #2b5972;background:#0b2032ed;border-radius:10px;padding:8px 11px;font-size:12px;color:#89a7bb;min-height:33px;box-shadow:0 3px 14px #0003}.source-trigger strong{color:#bde9ff;font-size:13px}.source-trigger .caret{color:#51b9df}.source-trigger[aria-expanded=true]{border-color:#38bfff}.mode-popover{position:absolute;left:0;top:42px;width:min(310px,calc(100vw - 36px));padding:13px;border:1px solid #335c75;border-radius:17px;background:#0b1929fa;box-shadow:0 15px 45px #000a;color:#d8e7f3;backdrop-filter:blur(16px)}.mode-popover[hidden]{display:none}.mode-heading{display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:650;margin-bottom:10px}.mode-close{background:none;border:0;color:#93adbf;font-size:21px;padding:0 4px}.source-options{display:grid;gap:5px}.source-option{display:grid;grid-template-columns:44px 1fr 12px;align-items:center;gap:8px;border:1px solid #263e52;background:#101f31;border-radius:9px;padding:9px 10px;text-align:left;color:#abc1d2;font-size:11px;min-height:41px}.source-option strong{color:#e6f4ff;font-size:13px}.source-option[aria-selected=true]{border-color:#29c8c5;background:#123c3e}.source-option:disabled{cursor:default;opacity:.6}.source-option .check{color:#36dfb8}.mode-message{font-size:10px;line-height:1.5;color:#8eabbf;margin:9px 0;min-height:15px}.mode-message.error{color:#f1a094}.mode-message.success{color:#65dfb8}.mode-apply{width:100%;border:1px solid #298d9c;background:#12434e;color:#a1eff4;border-radius:9px;padding:9px;font-size:11px;font-weight:600}.mode-apply:disabled{opacity:.4;cursor:default}.mode-note{font-size:10px;line-height:1.4;color:#a6b9c7;margin:0 0 8px}.source-option small{font-size:10px;color:#83a3b7}.mode-message:empty{display:none}
+      @media(max-width:520px){.inverter-mode{left:3px;top:5px}.source-trigger{font-size:10px;padding:5px 9px;gap:6px;min-height:28px;border-radius:8px}.source-trigger strong{font-size:11px}.mode-popover{top:34px;padding:11px}.source-option{padding:8px 9px;font-size:10px;min-height:39px}.mode-heading{font-size:12px}.mode-message{font-size:10px}}
     </style>
     <ha-card class="shell"><header><div><div class="eyebrow">МОЙ ДОМ · ANENJI 4200</div><h1>Энергетика</h1><div class="sub">Солнце, сеть и энергия вашего дома</div></div><span class="live" data-live><span class="dot"></span><span data-live-text>Подключение</span></span></header>
+    <div class="diagram-wrap"><div class="inverter-mode"><button class="source-trigger" data-source-open aria-haspopup="dialog" aria-expanded="false"><span>Режим</span><strong data-source-current>—</strong><span class="caret">⌄</span></button><div class="mode-popover" data-source-popover role="dialog" aria-label="Режим питания инвертора" hidden><div class="mode-heading">Приоритет питания<button class="mode-close" data-source-close aria-label="Закрыть выбор режима">×</button></div><div class="source-options" data-source-options role="listbox" aria-label="Доступные режимы"></div><div class="mode-message" data-source-message role="status"></div><p class="mode-note" data-source-note hidden>Переключение изменит источник питания дома.</p><button class="mode-apply" data-source-apply disabled>Применить режим</button></div></div>
     <svg class="diagram" viewBox="0 0 720 500" aria-label="Схема потоков энергии">
       <defs>${['solar','grid','battery'].map(c=>`<marker id="arrow-${c}" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0 0 5 2.5 0 5Z" fill="var(--${c})"/></marker>`).join('')}
       <linearGradient id="roof" x2="1" y2="1"><stop stop-color="#284361"/><stop offset="1" stop-color="#0c1829"/></linearGradient><linearGradient id="window" x2="0" y2="1"><stop stop-color="#ffc65e"/><stop offset="1" stop-color="#8e5b21"/></linearGradient><radialGradient id="halo"><stop stop-color="#22a891" stop-opacity=".12"/><stop offset="1" stop-color="#081421" stop-opacity="0"/></radialGradient></defs>
@@ -103,7 +117,7 @@ class EnergetikaCard extends HTMLElement {
       ${this._node('solar','Солнце','sun',480,34,205,'solar')}
       ${this._node('battery','АКБ','battery',278,274,172,'battery','Вт·ч осталось')}
       ${this._node('load','Нагрузка','home',531,274,174,'home')}
-    </svg>
+    </svg></div>
     <div class="section-label">ПОТОКИ МОЩНОСТИ <span style="color:#3f5e76">/ НАЖМИТЕ НА ЧИСЛО ДЛЯ ИСТОРИИ</span></div>
     <div class="tiles">
       ${this._tile('pv_battery','Солнце → АКБ','Заряд от солнечных панелей','sun','solar')}
@@ -136,6 +150,11 @@ class EnergetikaCard extends HTMLElement {
       try { localStorage.setItem('energetika.battery-mode',this._batteryMode); } catch {}
       this._update();
     }));
+    root.querySelector('[data-source-open]').addEventListener('click',()=>this._toggleSourceMenu());
+    root.querySelector('[data-source-close]').addEventListener('click',()=>this._closeSourceMenu());
+    root.querySelector('[data-source-apply]').addEventListener('click',()=>this._applySourceMode());
+    root.addEventListener('keydown',event=>{if(event.key==='Escape')this._closeSourceMenu();});
+    root.addEventListener('click',event=>{if(!event.composedPath().includes(root.querySelector('.inverter-mode')))this._closeSourceMenu(false);});
     root.querySelector('[data-calibrate]').addEventListener('click',()=>this._calibrate());
     this._update();
   }
@@ -150,6 +169,7 @@ class EnergetikaCard extends HTMLElement {
   _update() {
     if (!this._hass || !this.shadowRoot.firstChild) return;
     const r = this.shadowRoot, states = this._hass.states;
+    this._updateSourceMode();
     r.querySelectorAll('[data-value]').forEach(el=>{
       const key=el.dataset.value,n=this._number(key);
       const digits=/voltage|current|percent/.test(key)?1:0;
@@ -190,6 +210,80 @@ class EnergetikaCard extends HTMLElement {
     r.querySelector('[data-last-full]').textContent=last?`Последний полный заряд: ${new Date(last).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}`:'Полный заряд ещё не подтверждён';
     const updated=states[this._entities.load]?.last_updated;
     r.querySelector('[data-updated]').textContent=updated?`Данные · ${new Date(updated).toLocaleTimeString('ru-RU')}`:'Ожидание данных';
+  }
+  _sourceContext() {
+    const states=this._hass?.states||{},entity=this._entities.mode_select,native=states[entity];
+    const available=native&&!['unknown','unavailable',''].includes(native.state);
+    const current=available?native.state:states[this._entities.output_priority]?.state;
+    const options=Array.isArray(native?.attributes?.options)?native.attributes.options.filter(v=>typeof v==='string'):[];
+    let reason='';
+    if(this._hass?.connected===false)reason='Нет соединения с Home Assistant.';
+    else if(states[this._entities.control_mode]?.state==='read_only')reason='В EyeBond Local включён режим «Только чтение». Выбор пока недоступен.';
+    else if(!available)reason='Управление режимом пока недоступно в интеграции.';
+    return {entity,current,options,reason,writable:!reason&&typeof this._hass?.callService==='function'};
+  }
+  _sourceCode(option) {
+    const found=SOURCE_MODES.find(mode=>mode.option===option||mode.code===option);
+    if(found)return found.code;
+    const legacy={'Utility-PV-Battery':'UTI','PV-Utility-Battery':'SOL','PV-Battery-Utility':'SBU'};
+    if(legacy[option])return legacy[option];
+    const unknown=/^Unknown \((\d)\)$/.exec(option||'');
+    if(unknown&&SOURCE_MODES[Number(unknown[1])])return SOURCE_MODES[Number(unknown[1])].code;
+    return ['unknown','unavailable','',undefined].includes(option)?'Нет данных':option;
+  }
+  _toggleSourceMenu() {
+    const popover=this.shadowRoot.querySelector('[data-source-popover]');
+    if(!popover.hidden){this._closeSourceMenu();return;}
+    this._sourceDraft=this._sourceContext().current;this._sourceFeedback=null;
+    popover.hidden=false;this.shadowRoot.querySelector('[data-source-open]').setAttribute('aria-expanded','true');
+    this._updateSourceMode();
+    this.shadowRoot.querySelector('.source-option:not(:disabled)')?.focus();
+  }
+  _closeSourceMenu(focus=true) {
+    const popover=this.shadowRoot.querySelector('[data-source-popover]');
+    if(popover.hidden)return;
+    popover.hidden=true;const button=this.shadowRoot.querySelector('[data-source-open]');button.setAttribute('aria-expanded','false');
+    if(focus)button.focus();
+  }
+  _updateSourceMode() {
+    const r=this.shadowRoot,context=this._sourceContext();
+    r.querySelector('[data-source-current]').textContent=this._modePending?'Переключение…':this._sourceCode(context.current);
+    if(this._modePending&&context.current===this._modePending.option){
+      clearTimeout(this._modeTimeout);this._modePending=null;this._sourceFeedback={kind:'success',text:'Инвертор подтвердил режим '+this._sourceCode(context.current)+'.'};
+      r.querySelector('[data-source-current]').textContent=this._sourceCode(context.current);
+    }
+    if(r.querySelector('[data-source-popover]').hidden)return;
+    const rows=SOURCE_MODES.map(mode=>({...mode,enabled:context.writable&&context.options.includes(mode.option)}));
+    for(const option of context.options)if(!rows.some(row=>row.option===option))rows.push({code:this._sourceCode(option),option,description:option,enabled:context.writable});
+    const signature=JSON.stringify([rows,this._sourceDraft,context.current,!!this._modePending]);
+    if(signature!==this._modeRows){
+      this._modeRows=signature;
+      r.querySelector('[data-source-options]').innerHTML=rows.map((row,index)=>`<button class="source-option" data-source-index="${index}" role="option" aria-selected="${row.option===this._sourceDraft}" ${!row.enabled||this._modePending?'disabled':''}><strong>${escapeHtml(row.code)}</strong><span>${escapeHtml(row.description)}</span><span class="check">${row.option===context.current?'✓':''}</span></button>`).join('');
+      r.querySelectorAll('[data-source-index]').forEach(button=>button.addEventListener('click',()=>{this._sourceDraft=rows[Number(button.dataset.sourceIndex)].option;this._sourceFeedback=null;this._updateSourceMode();}));
+    }
+    const message=r.querySelector('[data-source-message]');
+    message.className='mode-message '+(this._sourceFeedback?.kind||'');
+    message.textContent=this._modePending?'Ожидание подтверждения инвертора…':context.reason||this._sourceFeedback?.text||'';
+    const note=r.querySelector('[data-source-note]');
+    note.hidden=!context.writable||this._sourceDraft===context.current;
+    note.textContent=this._sourceCode(this._sourceDraft)==='SUF'?'SUF допускает отдачу избытка энергии в сеть.':'Переключение изменит источник питания дома.';
+    const apply=r.querySelector('[data-source-apply]');
+    apply.disabled=!context.writable||!!this._modePending||!context.options.includes(this._sourceDraft)||this._sourceDraft===context.current;
+    apply.textContent=this._modePending?'Переключение…':'Применить '+this._sourceCode(this._sourceDraft||context.current);
+  }
+  async _applySourceMode() {
+    const context=this._sourceContext(),option=this._sourceDraft;
+    if(!context.writable||this._modePending||!context.options.includes(option)||option===context.current)return;
+    this._modePending={option};this._sourceFeedback=null;this._updateSourceMode();
+    this._modeTimeout=setTimeout(()=>{if(!this._modePending)return;this._modePending=null;this._sourceFeedback={kind:'error',text:'Подтверждение не получено. Проверьте текущий режим перед повтором.'};this._updateSourceMode();},15000);
+    try {
+      await this._hass.callService('select','select_option',{entity_id:context.entity,option});
+      this._updateSourceMode();
+    }catch(error){
+      clearTimeout(this._modeTimeout);this._modePending=null;
+      this._sourceFeedback={kind:'error',text:'Режим не подтверждён. '+String(error?.message||'Проверьте соединение с инвертором.')};
+      this._updateSourceMode();
+    }
   }
   _moreInfo(key) {
     const entityId=this._entities[key];if(!entityId)return;
