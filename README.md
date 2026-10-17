@@ -93,11 +93,11 @@ Home Assistant 2026.10, EyeBond Local **0.1.53**, драйвер `modbus_smg`, �
 
 ## Ручне встановлення
 
-Для версії 2.12.1 після копіювання JS створіть у `www` також копію `energetika-card.js` з назвою **`energetika-card-2.12.1.js`**. Саме цю копію підключіть як ресурс. Офлайн-встановлювач створює її автоматично. Ім’я з версією допомагає уникнути старої копії картки у кеші під час оновлення.
+Для версії 2.12.2 після копіювання JS створіть у `www` також копію `energetika-card.js` з назвою **`energetika-card-2.12.2.js`**. Саме цю копію підключіть як ресурс. Офлайн-встановлювач створює її автоматично. Ім’я з версією допомагає уникнути старої копії картки у кеші під час оновлення.
 
 Повні кроки, відповідність сутностей, оновлення і відкат — у **[docs/INSTALL.uk.md](docs/INSTALL.uk.md)**.
 
-Скопіюйте `custom_components/energetika_dtek` до `custom_components` HA, `energetika.yaml` до каталогу конфігурації HA, вісім JS-файлів (`energetika-card.js`, `energetika-history.js`, `energetika-settings.js`, `energetika-automation.js`, `energetika-data.js`, `energetika-alerts.js`, `energetika-hourly.js`, `energetika-dtek.js`) — до `www`. Додайте пакет у `homeassistant.packages`, перевірте конфігурацію та перезапустіть HA. Додайте ресурс `/local/energetika-card-2.12.1.js` типу JavaScript module і вставте `dashboard-energetika.yaml` у текстовий редактор окремої панелі. Не замінюйте власний `configuration.yaml` цілком.
+Скопіюйте `custom_components/energetika_dtek` до `custom_components` HA, `energetika.yaml` до каталогу конфігурації HA, вісім JS-файлів (`energetika-card.js`, `energetika-history.js`, `energetika-settings.js`, `energetika-automation.js`, `energetika-data.js`, `energetika-alerts.js`, `energetika-hourly.js`, `energetika-dtek.js`) — до `www`. Додайте пакет у `homeassistant.packages`, перевірте конфігурацію та перезапустіть HA. Додайте ресурс `/local/energetika-card-2.12.2.js` типу JavaScript module і вставте `dashboard-energetika.yaml` у текстовий редактор окремої панелі. Не замінюйте власний `configuration.yaml` цілком.
 
 Для сумісного драйвера використайте `patches/install_guard.py`. Самостійний офлайн-інсталятор цієї конкретної конфігурації збирається командою `python build_deploy.py` у `.deploy/install_energetika_v2.py`. Перед застосуванням на іншому обладнанні адаптуйте всі сутності, ємність і межі.
 

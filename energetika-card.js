@@ -9,7 +9,7 @@ export function formatRuntime(minutes) {
   const total=Math.floor(minutes);
   return total===0?'0 мин':`${Math.floor(total/60)} ч ${String(total%60).padStart(2,'0')} мин`;
 }
-/* Energetika 2.12.1 — local Home Assistant card, no external dependencies. */
+/* Energetika 2.12.2 — local Home Assistant card, no external dependencies. */
 const ROOT = 'sensor.anenji_4200_protocol_1_';
 const SOURCE_MODES = [
   {code:'UTI', option:'Utility First (UTI)', description:'Сеть в приоритете'},
@@ -52,14 +52,16 @@ const value = (key, unit = 'Вт') => `<span data-value="${key}">—</span><span
 // Both views use the same elements, live values and graph handlers.
 const VISUAL_LAYOUTS = {
   minimal:{
+    size:[440,300],
     nodes:{grid:[8,0,164],solar:[268,0,164],battery:[8,154,164],load:[268,154,164]},
     flows:{grid_battery:['M54 114V154',54,134],pv_battery:['M268 54H220V135H136V154',220,105],pv_load:['M350 114V154',350,134],grid_load:['M172 54H194V125C182 125 182 145 194 145V174H268',230,174],battery_load:['M172 211H268',220,211]},
     crossing:'M194 125C182 125 182 145 194 145',
   },
   home:{
-    nodes:{grid:[8,40,154],solar:[280,0,154],battery:[8,186,154],load:[280,186,154]},
-    flows:{grid_battery:['M54 154V186',54,170],pv_battery:['M280 54H220V162H136V186',220,105],pv_load:['M356 114V186',356,150],grid_load:['M162 94H194V152C182 152 182 172 194 172V206H280',236,206],battery_load:['M162 243H280',220,243]},
-    crossing:'M194 152C182 152 182 172 194 172',
+    size:[720,500],
+    nodes:{grid:[18,130,174,132],solar:[395,34,205,112],battery:[236,274,172,132],load:[531,274,174,112]},
+    flows:{grid_battery:['M104 262V330H236',170,330],pv_battery:['M428 146V198H323V274',323,230],pv_load:['M540 146V218H618V274',618,238],grid_load:['M104 262V454H618V386',357,454],battery_load:['M408 330H531',469.5,330]},
+    crossing:'',
   },
 };
 
@@ -103,10 +105,10 @@ class EnergetikaCard extends HTMLElement {
     return `<button class="tile ${color}" data-key="${key}" title="Открыть историю: ${title}">${icon(ic)}<span class="tile-body"><span class="tile-title">${title}</span><strong>${value(key)}</strong><small>${subtitle}</small></span><span class="arrow">›</span></button>`;
   }
   _houseScene() {
-    return `<svg class="house-scene" viewBox="0 0 440 300" aria-hidden="true" focusable="false">
+    return `<svg class="house-scene" viewBox="0 0 720 500" preserveAspectRatio="none" aria-hidden="true" focusable="false">
       <defs><linearGradient id="house-roof" x2="1" y2="1"><stop stop-color="#365875"/><stop offset="1" stop-color="#14253a"/></linearGradient><linearGradient id="house-window" x2="0" y2="1"><stop stop-color="#ffdb8a"/><stop offset="1" stop-color="#c07b2b"/></linearGradient><radialGradient id="house-halo"><stop stop-color="#30bfa3" stop-opacity=".22"/><stop offset="1" stop-color="#081421" stop-opacity="0"/></radialGradient></defs>
-      <ellipse cx="248" cy="191" rx="182" ry="108" fill="url(#house-halo)"/>
-      <g transform="translate(-48 -40) scale(.8)" stroke-linejoin="round">
+      <ellipse cx="365" cy="280" rx="280" ry="150" fill="url(#house-halo)"/>
+      <g stroke-linejoin="round">
         <path d="M170 237 348 132 552 237 518 255 348 170 205 256Z" fill="url(#house-roof)" stroke="#557890" stroke-width="2"/>
         <path d="M207 255v118h308V254L348 170Z" fill="#172f40" stroke="#426376" stroke-width="2"/>
         <path d="M210 373h315" stroke="#557f82" stroke-width="3"/>
@@ -120,16 +122,19 @@ class EnergetikaCard extends HTMLElement {
   }
   _applyVisualMode() {
     const r=this.shadowRoot,layout=VISUAL_LAYOUTS[this._visualMode];
+    const [boxWidth,boxHeight]=layout.size;
     r.querySelector('.shell').dataset.visual=this._visualMode;
+    r.querySelector('svg.diagram').setAttribute('viewBox',`0 0 ${boxWidth} ${boxHeight}`);
     r.querySelectorAll('[data-visual-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.visualMode===this._visualMode)));
-    for(const [key,[x,y,width]] of Object.entries(layout.nodes)){
+    for(const [key,[x,y,width,height=114]] of Object.entries(layout.nodes)){
       const node=r.querySelector(`.node[data-key="${key}"]`);
-      node.style.left=x/440*100+'%';node.style.top=y/300*100+'%';node.style.width=width/440*100+'%';
+      node.style.left=x/boxWidth*100+'%';node.style.top=y/boxHeight*100+'%';node.style.width=width/boxWidth*100+'%';
+      node.style.height=height/boxHeight*100+'%';node.style.setProperty('--node-height',height/boxHeight*100+'%');
     }
     for(const [key,[path,x,y]] of Object.entries(layout.flows)){
       const flow=r.querySelector(`g.flow[data-flow="${key}"]`);
       flow.querySelectorAll('.track,.wire,.moving').forEach(line=>line.setAttribute('d',path));
-      const label=r.querySelector(`.flow-label[data-flow="${key}"]`);label.style.left=x/440*100+'%';label.style.top=y/300*100+'%';
+      const label=r.querySelector(`.flow-label[data-flow="${key}"]`);label.style.left=x/boxWidth*100+'%';label.style.top=y/boxHeight*100+'%';
     }
     r.querySelector('.crossing-gap').setAttribute('d',layout.crossing);
   }
@@ -201,6 +206,12 @@ class EnergetikaCard extends HTMLElement {
       @media(max-width:750px){.header-tools{gap:6px}.header-tools .live{width:19px;height:19px;justify-content:center;padding:0}.header-tools [data-live-text]{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.visual-switch{padding:2px;border-radius:8px}.visual-switch button{min-height:27px;padding:3px 7px;font-size:10px;gap:4px}.visual-switch button svg{width:12px;height:12px}}
       @media(max-width:390px){.header-tools{gap:4px}.visual-switch button{padding:3px 5px;gap:3px}.visual-switch button svg{display:none}}
       @media(orientation:landscape) and (min-width:640px) and (max-height:600px){.header-tools{position:absolute;top:5px;left:145px;right:auto;gap:0}.header-tools .live{display:none}.visual-switch{padding:1px;border-radius:7px}.visual-switch button{min-height:24px;padding:2px 7px;font-size:10px;gap:4px}.visual-switch button svg{width:12px;height:12px}.shell[data-visual=home] .diagram-stage>.node{height:38%!important}.shell[data-visual=home] .node>.node-metrics{gap:4px}}
+      /* The Home view follows the original house scene, with a wider battery-to-load gap. */
+      .home-route-caption{display:none;fill:#68869d;font-size:12px;letter-spacing:2px;text-anchor:middle}.shell[data-visual=home] .home-route-caption{display:block}.shell[data-visual=home] .house-scene{opacity:.45}.shell[data-visual=home] .diagram-stage{height:clamp(310px,38dvh,340px);min-height:310px;max-height:none;aspect-ratio:auto}
+      .shell[data-visual=home] .diagram-stage>.node{height:var(--node-height)!important;padding:4px;gap:1px;border-radius:12px}.shell[data-visual=home] .node-heading{min-height:14px;gap:4px}.shell[data-visual=home] .node-heading .node-name{font-size:11px}.shell[data-visual=home] .node-symbol>.icon,.shell[data-visual=home] .node-symbol>.grid-cross{width:14px;height:14px}.shell[data-visual=home] .node-chevron{display:none}.shell[data-visual=home] .node-reading{flex-wrap:wrap;gap:0 3px}.shell[data-visual=home] .node-reading .node-value{font-size:22px;line-height:1}.shell[data-visual=home] .node-reading .node-unit{width:100%;font-size:8px;line-height:1.1}.shell[data-visual=home] .node>.node-metrics{font-size:9.5px;line-height:1.1;gap:4px}.shell[data-visual=home] .node>.node-runtime{font-size:9px;line-height:1.1}.shell[data-visual=home] .node>.grid-timer{font-size:8.5px;line-height:1.1;padding:1px 2px;border-radius:4px}.shell[data-visual=home] .diagram-stage>.flow-label{min-width:40px;font-size:12px;padding:4px 5px}.shell[data-visual=home] .flow-label .flow-unit{font-size:9px}
+      @media(max-width:750px){.shell[data-visual=home] .diagram-stage{height:310px;min-height:310px}}
+      @media(max-width:390px){.shell[data-visual=home] .node-reading .node-value{font-size:20px}.shell[data-visual=home] .node>.node-metrics{font-size:9px;gap:3px}.shell[data-visual=home] .node>.node-runtime{font-size:8.5px}.shell[data-visual=home] .node>.grid-timer{font-size:8px}.shell[data-visual=home] .diagram-stage>.flow-label{min-width:36px;font-size:11px;padding:4px}}
+      @media(orientation:landscape) and (min-width:640px) and (max-height:600px){.shell[data-visual=home] .diagram-stage{height:100%;min-height:0}.shell[data-visual=home] .diagram-stage>.node{min-height:50px;padding:2px;gap:0;border-radius:8px}.shell[data-visual=home] .diagram-stage>.node[data-key=battery],.shell[data-visual=home] .diagram-stage>.node[data-key=grid]{min-height:60px}.shell[data-visual=home] .node-heading{min-height:12px;gap:3px}.shell[data-visual=home] .node-heading .node-name{font-size:10px}.shell[data-visual=home] .node-symbol>.icon,.shell[data-visual=home] .node-symbol>.grid-cross{width:12px;height:12px}.shell[data-visual=home] .node-reading{flex-wrap:nowrap;gap:2px}.shell[data-visual=home] .node-reading .node-value{font-size:18px}.shell[data-visual=home] .node-reading .node-unit{width:auto;font-size:8px}.shell[data-visual=home] .node>.node-metrics{font-size:8.5px;gap:3px}.shell[data-visual=home] .node>.node-runtime{font-size:8.5px}.shell[data-visual=home] .node>.grid-timer{font-size:8px;padding:0 2px}.shell[data-visual=home] .diagram-stage>.flow-label{min-width:32px;padding:2px 3px;font-size:10px}.shell[data-visual=home] .flow-label .flow-unit{font-size:8px}}
     </style>
     <ha-card class="shell"><div class="first-screen"><header><div class="energy-heading"><div class="eyebrow">МОЙ ДОМ · ANENJI 4200</div><h1>Энергетика</h1><div class="sub">Солнце, сеть и энергия вашего дома</div></div><div class="header-tools"><div class="visual-switch" role="group" aria-label="Вид энергомониторинга"><button data-visual-mode="minimal" aria-pressed="true" title="Крупные плитки и простая схема"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2" y="2" width="4" height="4" rx="1"/><rect x="10" y="2" width="4" height="4" rx="1"/><rect x="2" y="10" width="4" height="4" rx="1"/><rect x="10" y="10" width="4" height="4" rx="1"/></svg>Минимализм</button><button data-visual-mode="home" aria-pressed="false" title="Дом и анимированные потоки энергии"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="m1 7 7-6 7 6M3 6v9h4v-5h3v5h3V6"/></svg>Дом</button></div><span class="live" data-live><span class="dot"></span><span data-live-text>Подключение</span></span></div></header>
     <div class="overview">
@@ -214,6 +225,7 @@ class EnergetikaCard extends HTMLElement {
       ${this._flow('pv_load','M350 114V154','solar')}
       ${this._flow('grid_load','M172 54H194V125C182 125 182 145 194 145V174H268','grid')}
       ${this._flow('battery_load','M172 211H268','battery')}
+      <text class="home-route-caption" x="357" y="489">СЕТЬ → ДОМ · БАЙПАС</text>
     </svg>
       ${this._node('grid','Сеть','grid',8,0,164,'grid')}
       ${this._node('solar','Солнце','sun',268,0,164,'solar')}
@@ -262,6 +274,7 @@ class EnergetikaCard extends HTMLElement {
       this._visualMode=button.dataset.visualMode;
       try {localStorage.setItem('energetika.visual-mode',this._visualMode);} catch {}
       this._applyVisualMode();
+      this._update();
     }));
     this._applyVisualMode();
     const gridTimer=root.querySelector('[data-grid-timer]');
@@ -350,7 +363,7 @@ class EnergetikaCard extends HTMLElement {
     const minutes=this._number('runtime');
     const power=this._number('battery_power');
     const timeText=minutes!==null?formatRuntime(minutes):power!==null&&power>5?'Идёт заряд':power!==null&&Math.abs(power)<=5?'Нет разряда':'Нет данных';
-    r.querySelectorAll('[data-runtime]').forEach(el=>el.textContent=minutes!==null?`До 20% · ${timeText}`:timeText);
+    r.querySelectorAll('[data-runtime]').forEach(el=>el.textContent=minutes!==null?`${this._visualMode==='home'&&el.closest('.node')?'20%':'До 20%'} · ${timeText}`:timeText);
     const energy=states[this._entities.battery],message=r.querySelector('[data-calibration]');
     const uncalibrated=this._number('battery')===null;
     const gap=energy?.attributes?.data_gap===true;
