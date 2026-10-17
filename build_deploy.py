@@ -51,7 +51,7 @@ def main():
         temporary.write_text(files[name],encoding='utf-8')
         temporary.replace(path)
     print('UI and YAML installed; backup:',backup)
-    print('Restart Home Assistant; update resource URL to /local/energetika-card.js?v=2.8.2')
+    print('Restart Home Assistant; update resource URL to /local/energetika-card.js?v=2.9.2')
 if __name__=='__main__': main()
 ''' % payload
 Path('.deploy').mkdir(exist_ok=True)

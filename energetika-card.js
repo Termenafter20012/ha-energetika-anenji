@@ -8,7 +8,7 @@ export function formatRuntime(minutes) {
   const total=Math.floor(minutes);
   return total===0?'0 мин':`${Math.floor(total/60)} ч ${String(total%60).padStart(2,'0')} мин`;
 }
-/* Energetika 2.8.2 — local Home Assistant card, no external dependencies. */
+/* Energetika 2.9.2 — local Home Assistant card, no external dependencies. */
 const ROOT = 'sensor.anenji_4200_protocol_1_';
 const SOURCE_MODES = [
   {code:'UTI', option:'Utility First (UTI)', description:'Сеть в приоритете'},
@@ -68,20 +68,19 @@ class EnergetikaCard extends HTMLElement {
   connectedCallback() { if (!this.shadowRoot.firstChild) this._render(); clearInterval(this._gridClock); this._gridClock=setInterval(()=>this._updateGrid(),15000); }
   disconnectedCallback() { clearTimeout(this._modeTimeout); clearInterval(this._gridClock); }
   _node(key, name, ic, x, y, w, color, unit = 'Вт') {
-    return `<g class="node ${color}" data-key="${key}" role="button" tabindex="0" aria-label="${name}: открыть историю" transform="translate(${x} ${y})">
-      <rect class="node-bg" width="${w}" height="${['battery','grid'].includes(key) ? 132 : 112}" rx="16"/>
-      <svg x="12" y="22" width="38" height="44" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">${ICONS[ic]}</svg>
-      ${key==='grid'?'<g class="grid-cross" aria-hidden="true"><path d="M10 20 53 68M53 20 10 68"/></g>':''}
-      <text class="node-name" x="60" y="29">${name}</text>
-      <text class="node-value" x="60" y="59" data-value="${key}">—</text>
-      <text class="node-unit" x="60" y="79">${unit}</text>
-      <text class="node-metrics" x="12" y="100"><tspan data-key="${key==='battery'?'voltage':key+'_voltage'}" role="button" tabindex="0" aria-label="${name}: напряжение"><tspan data-value="${key==='battery'?'voltage':key+'_voltage'}">—</tspan> В</tspan><tspan dx="13" data-key="${key==='battery'?'current':key+'_current'}" role="button" tabindex="0" aria-label="${name}: ток">${key==='grid'?'≈ ':''}<tspan data-value="${key==='battery'?'current':key+'_current'}">—</tspan> А</tspan></text>
-      ${key==='battery'?'<text class="node-runtime" x="12" y="121" data-runtime>До 20% · —</text>':''}${key==='grid'?'<g class="grid-timer" data-grid-timer role="button" tabindex="0" aria-label="График отключений ДТЭК"><title data-grid-timer-title>Открыть график ДТЭК</title><rect x="8" y="108" width="158" height="18" rx="5"/><text x="14" y="121" data-grid-countdown>Срок не указан</text></g>':''}<path class="chev" d="m${w-18} 41 5 5-5 5"/>
-    </g>`;
+    const voltage=key==='battery'?'voltage':key+'_voltage',current=key==='battery'?'current':key+'_current';
+    return `<div class="node ${color}" data-key="${key}" role="button" tabindex="0" aria-label="${name}: открыть историю" style="left:${x/440*100}%;top:${y/300*100}%;width:${w/440*100}%;height:38%">
+      <div class="node-heading"><span class="node-symbol">${icon(ic)}${key==='grid'?'<svg class="grid-cross" viewBox="0 0 48 48" aria-hidden="true"><path d="M6 6 42 42M42 6 6 42"/></svg>':''}</span><span class="node-name">${name}</span><span class="node-chevron" aria-hidden="true">›</span></div>
+      <div class="node-reading"><strong class="node-value" data-value="${key}">—</strong><span class="node-unit">${unit}</span></div>
+      <div class="node-metrics"><button data-key="${voltage}" aria-label="${name}: напряжение"><span data-value="${voltage}">—</span> В</button><button data-key="${current}" aria-label="${name}: ток">${key==='grid'?'≈ ':''}<span data-value="${current}">—</span> А</button></div>
+      ${key==='battery'?'<div class="node-runtime" data-runtime>До 20% · —</div>':''}${key==='grid'?'<button class="grid-timer" data-grid-timer aria-label="График отключений ДТЭК" title="Открыть график ДТЭК"><span data-grid-countdown>Срок не указан</span></button>':''}
+    </div>`;
   }
-  _flow(key, d, x, y, color, label) {
-    return `<g class="flow ${color}" data-flow="${key}"><path class="track" d="${d}"/><path class="wire" d="${d}"/><path class="moving" d="${d}" marker-end="url(#arrow-${color})"/>
-      <g class="flow-label" data-key="${key}" role="button" tabindex="0" aria-label="${label}: открыть историю" transform="translate(${x} ${y})"><rect x="${key === 'battery_load' ? -36 : -48}" y="-19" width="${key === 'battery_load' ? 72 : 96}" height="38" rx="12"/><text y="7" text-anchor="middle"><tspan data-value="${key}">—</tspan><tspan class="flow-unit"> Вт</tspan></text></g></g>`;
+  _flow(key, d, color) {
+    return `<g class="flow ${color}" data-flow="${key}"><path class="track" d="${d}"/><path class="wire" d="${d}"/><path class="moving" d="${d}" marker-end="url(#arrow-${color})"/></g>`;
+  }
+  _flowLabel(key, x, y, color, label) {
+    return `<button class="flow-label ${color}" data-flow="${key}" data-key="${key}" title="${label} · открыть историю" aria-label="${label}: открыть историю" style="left:${x/440*100}%;top:${y/300*100}%"><span data-value="${key}">—</span><span class="flow-unit"> Вт</span></button>`;
   }
   _tile(key, title, subtitle, ic, color) {
     return `<button class="tile ${color}" data-key="${key}" title="Открыть историю: ${title}">${icon(ic)}<span class="tile-body"><span class="tile-title">${title}</span><strong>${value(key)}</strong><small>${subtitle}</small></span><span class="arrow">›</span></button>`;
@@ -109,25 +108,47 @@ class EnergetikaCard extends HTMLElement {
       .grid-cross{display:none;fill:none;stroke:#ff4263;stroke-width:6;stroke-linecap:round;filter:drop-shadow(0 0 4px #ff1744)}.grid-absent .grid-cross{display:block}.grid-absent .node-bg{fill:#2c101d;stroke:#ff526f;stroke-width:2.6}.grid-absent .node-unit{fill:#ff8ca1;font-weight:750}.grid-absent .node-name{fill:#ffb4c1}
       .grid-timer rect{fill:#102432;stroke:#315367;stroke-width:.7}.grid-timer text{fill:#8ba7b9;font-size:10px;font-weight:600;font-variant-numeric:tabular-nums}.grid-timer.scheduled rect{fill:#302a16;stroke:#796232}.grid-timer.scheduled text{fill:#f0d58b}.grid-absent .grid-timer rect{fill:#401b2a;stroke:#8d4055}.grid-absent .grid-timer text{fill:#ffb5c3}.grid-timer:hover rect{stroke:#c5e3ef}
       .battery-layout{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)}.battery-summary [hidden],details [data-energy-only][hidden],details [data-voltage-only][hidden]{display:none!important}.battery-layout .mini{min-width:0}.battery-layout .mini>span{white-space:nowrap}.battery-main .plain-value strong,.battery-layout .mini strong{font-variant-numeric:tabular-nums}.battery-estimate{font-size:9px;color:#829eac}.bar.no-data{opacity:.35}
+
+      /* Text stays in CSS pixels; only the animated wires scale with the diagram. */
+      .diagram-wrap{padding-top:42px}.diagram-stage{position:relative;width:100%;max-width:620px;max-height:340px;aspect-ratio:440/300;margin:0 auto 4px}
+      .diagram-stage>.diagram{position:absolute;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;pointer-events:none}
+      .diagram-stage>.node{position:absolute;display:flex;flex-direction:column;gap:4px;padding:10px;border:1px solid color-mix(in srgb,var(--tone) 70%,#243b50);border-radius:16px;background:linear-gradient(135deg,color-mix(in srgb,var(--tone) 6%,#091624),#0a1726);filter:none;box-shadow:0 4px 16px #0002;overflow:hidden;min-width:0}
+      .node-heading{display:flex;align-items:center;gap:7px;min-height:22px}.node-symbol{position:relative;display:inline-flex;flex-shrink:0}.node-symbol>.icon,.node-symbol>.grid-cross{width:22px;height:22px}.node-symbol>.grid-cross{position:absolute;inset:0}
+      .node-heading .node-name{color:#d8e7f2;font-size:15px;font-weight:600;line-height:1.1}.node-chevron{margin-left:auto;color:var(--tone);font-size:22px;line-height:1}
+      .node-reading{display:flex;align-items:baseline;gap:5px;min-width:0}.node-reading .node-value{font-size:30px;font-weight:750;letter-spacing:-.6px;line-height:1.05;color:#f4f9ff;white-space:nowrap}.node-reading .node-unit{font-size:12px;color:#aac2d5;white-space:nowrap}
+      .node>.node-metrics{display:flex;gap:10px;font-size:14px;line-height:1.25;font-weight:550;font-variant-numeric:tabular-nums}.node-metrics>button{padding:0;border:0;background:transparent;color:#b4cbdc;font:inherit;white-space:nowrap}.node-metrics>button:hover{color:#fff;text-decoration:underline}
+      .node>.node-runtime{font-size:13px;color:#8ce2ca;line-height:1.2;white-space:nowrap;font-variant-numeric:tabular-nums;margin-top:auto}
+      .node>.grid-timer{display:block;margin-top:auto;padding:3px 4px;border:1px solid #36566c;border-radius:6px;background:#102737;color:#b3cbdc;font-size:12px;font-weight:600;line-height:1.2;text-align:left;white-space:nowrap;min-width:0;font-variant-numeric:tabular-nums}
+      .node>.grid-timer.scheduled{background:#302914;border-color:#826c36;color:#ffe09a}.diagram-stage>.node.grid-absent{border-color:#ff607d;background:linear-gradient(135deg,#311526,#1e1424);box-shadow:0 0 14px #ff426318}.grid-absent .node-name{color:#ffd2dd}.grid-absent .node-reading .node-unit{color:#ff9eb4;font-size:11px;font-weight:650}.grid-absent>.grid-timer{background:#3c1a2b;border-color:#95465c;color:#ffd1de}
+      .diagram-stage>.flow-label{position:absolute;transform:translate(-50%,-50%);min-width:45px;max-width:22%;padding:4px 6px;border:1px solid color-mix(in srgb,var(--tone) 50%,#20384d);border-radius:8px;background:#0c1c2a;color:#b9cbd9;font-size:13px;font-weight:650;line-height:1.1;font-variant-numeric:tabular-nums;white-space:nowrap;box-shadow:0 2px 7px #0004}
+      .diagram-stage>.flow-label.active{color:#f5fbff;border-color:var(--tone);background:color-mix(in srgb,var(--tone) 10%,#0a1925)}.diagram-stage>.flow-label .flow-unit{font-size:10px;color:#a9becd;font-weight:500}
+      energetika-alerts-panel{left:50%;transform:translateX(-50%)}
+      @media(max-width:750px){.diagram-wrap{padding-top:36px}.diagram-stage{max-width:500px;min-height:270px}.diagram-stage>.node{padding:6px;gap:2px;border-radius:13px}.node-heading{gap:5px;min-height:18px}.node-heading .node-name{font-size:13px}.node-symbol>.icon,.node-symbol>.grid-cross{width:18px;height:18px}.node-reading .node-value{font-size:25px}.node-reading .node-unit{font-size:11px}.node>.node-metrics{font-size:14px;gap:6px}.node>.node-runtime{font-size:13px}.node>.grid-timer{font-size:12px;padding:2px 3px}.diagram-stage>.flow-label{font-size:12px;padding:4px 5px}.grid-absent .node-reading .node-unit{font-size:10px}}
+      @media(max-width:390px){.diagram-stage>.node{padding:5px;gap:2px}.node-heading .node-name{font-size:12px}.node-reading .node-value{font-size:23px}.node>.node-metrics{font-size:13px;gap:6px}.node>.node-runtime{font-size:12px}.node>.grid-timer{font-size:11.5px}.node-symbol>.icon,.node-symbol>.grid-cross{width:18px;height:18px}.diagram-stage>.flow-label{min-width:41px;padding:4px;font-size:11px}}
+      .node.grid-absent>.grid-timer.scheduled{background:#3c1a2b;border-color:#95465c;color:#ffd1de}
+      .shell>header{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin:0;text-align:left}.energy-heading{position:static;display:flex;flex-direction:column;align-items:flex-start;min-width:0;text-align:left}.energy-heading h1{margin-left:0;transform:none;white-space:nowrap}.energy-heading .eyebrow{margin-left:0;transform:none}
     </style>
-    <ha-card class="shell"><header><div><div class="eyebrow">МОЙ ДОМ · ANENJI 4200</div><h1>Энергетика</h1><div class="sub">Солнце, сеть и энергия вашего дома</div></div><span class="live" data-live><span class="dot"></span><span data-live-text>Подключение</span></span></header>
+    <ha-card class="shell"><header><div class="energy-heading"><div class="eyebrow">МОЙ ДОМ · ANENJI 4200</div><h1>Энергетика</h1><div class="sub">Солнце, сеть и энергия вашего дома</div></div><span class="live" data-live><span class="dot"></span><span data-live-text>Подключение</span></span></header>
     <div class="diagram-wrap"><energetika-alerts-panel></energetika-alerts-panel><button class="settings-gear" data-settings-open aria-label="Настройки инвертора" title="Настройки инвертора"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 3-.6 2.1-1.5.9-2.1-.5-2 3.5 1.5 1.6v1.8L2.8 14l2 3.5 2.1-.5 1.5.9L9 20h4l.6-2.1 1.5-.9 2.1.5 2-3.5-1.5-1.6v-1.8L19.2 9l-2-3.5-2.1.5-1.5-.9L13 3Z"/><circle cx="11" cy="11.5" r="3.2"/></svg></button><div class="inverter-mode"><button class="source-trigger" data-source-open aria-haspopup="dialog" aria-expanded="false"><span>Режим</span><strong data-source-current>—</strong><span class="caret">⌄</span></button><div class="mode-popover" data-source-popover role="dialog" aria-label="Режим питания инвертора" hidden><div class="mode-heading">Приоритет питания<button class="mode-close" data-source-close aria-label="Закрыть выбор режима">×</button></div><div class="source-options" data-source-options role="group" aria-label="Доступные режимы"></div><div class="mode-message" data-source-message role="status"></div><p class="mode-note" data-source-note hidden>Переключение изменит источник питания дома.</p><button class="mode-apply" data-source-apply disabled>Применить режим</button><button class="mode-setting-link" data-settings-link>Все настройки инвертора →</button></div></div>
-    <svg class="diagram" viewBox="0 0 720 500" aria-label="Схема потоков энергии">
-      <defs>${['solar','grid','battery'].map(c=>`<marker id="arrow-${c}" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0 0 5 2.5 0 5Z" fill="var(--${c})"/></marker>`).join('')}
-      <linearGradient id="roof" x2="1" y2="1"><stop stop-color="#284361"/><stop offset="1" stop-color="#0c1829"/></linearGradient><linearGradient id="window" x2="0" y2="1"><stop stop-color="#ffc65e"/><stop offset="1" stop-color="#8e5b21"/></linearGradient><radialGradient id="halo"><stop stop-color="#22a891" stop-opacity=".12"/><stop offset="1" stop-color="#081421" stop-opacity="0"/></radialGradient></defs>
-      <ellipse cx="365" cy="280" rx="280" ry="150" fill="url(#halo)"/>
-      <g class="scene"><path d="M170 237 348 132 552 237 518 255 348 170 205 256Z" fill="url(#roof)" stroke="#3a5871"/><path d="M207 255v118h308V254L348 170Z" fill="#102232" stroke="#2e4b61"/><path d="M210 373h315" stroke="#46616b"/><path d="m287 195 63-35 111 57-64 36Z" fill="#12314a" stroke="#487896"/><path d="m310 182 109 58m-84-72 109 59m-132-19 61-35m-33 50 62-35" stroke="#36637f" stroke-width="2"/><rect x="222" y="279" width="47" height="58" rx="2" fill="url(#window)"/><path d="M245 279v58m-23-27h47" stroke="#233e4b" stroke-width="4"/><rect x="451" y="279" width="43" height="58" rx="2" fill="url(#window)"/><path d="M472 279v58m-21-27h43" stroke="#233e4b" stroke-width="4"/><path d="M179 374h366" stroke="#2a4c50" stroke-width="3"/></g>
-      ${this._flow('pv_battery','M428 146V198H357V274',357,230,'solar','Солнце → АКБ')}
-      ${this._flow('pv_load','M540 146V218H625V274',625,238,'solar','Солнце → нагрузка')}
-      ${this._flow('grid_battery','M104 262V330H278',193,330,'grid','Сеть → АКБ')}
-      ${this._flow('grid_load','M104 262V454H616V386',357,454,'grid','Сеть → нагрузка, байпас')}
-      ${this._flow('battery_load','M450 330H531',491,330,'battery','АКБ → нагрузка')}
-      <text x="357" y="489" class="route-caption">СЕТЬ → ДОМ · БАЙПАС</text>
-      ${this._node('grid','Сеть','grid',18,130,174,'grid')}
-      ${this._node('solar','Солнце','sun',395,34,205,'solar')}
-      ${this._node('battery','АКБ','battery',278,274,172,'battery','Вт·ч осталось')}
-      ${this._node('load','Нагрузка','home',531,274,174,'home')}
-    </svg></div>
+    <div class="diagram-stage">
+    <svg class="diagram" viewBox="0 0 440 300" preserveAspectRatio="none" aria-label="Направления потоков энергии">
+      <defs>${['solar','grid','battery'].map(c=>`<marker id="arrow-${c}" markerWidth="4" markerHeight="4" refX="3.5" refY="2" orient="auto"><path d="M0 0 4 2 0 4Z" fill="var(--${c})"/></marker>`).join('')}</defs>
+      ${this._flow('grid_load','M8 54H1V286H350V268','grid')}
+      ${this._flow('grid_battery','M54 114V154','grid')}
+      ${this._flow('pv_battery','M268 54H220V135H136V154','solar')}
+      ${this._flow('pv_load','M350 114V154','solar')}
+      ${this._flow('battery_load','M172 211H268','battery')}
+    </svg>
+      ${this._node('grid','Сеть','grid',8,0,164,'grid')}
+      ${this._node('solar','Солнце','sun',268,0,164,'solar')}
+      ${this._node('battery','АКБ','battery',8,154,164,'battery','Вт·ч')}
+      ${this._node('load','Нагрузка','home',268,154,164,'home')}
+      ${this._flowLabel('grid_battery',54,134,'grid','Сеть → АКБ')}
+      ${this._flowLabel('pv_battery',220,105,'solar','Солнце → АКБ')}
+      ${this._flowLabel('pv_load',350,134,'solar','Солнце → нагрузка')}
+      ${this._flowLabel('battery_load',220,211,'battery','АКБ → нагрузка')}
+      ${this._flowLabel('grid_load',220,286,'grid','Сеть → нагрузка, байпас')}
+    </div></div>
     <div class="section-label">ПОТОКИ МОЩНОСТИ <span style="color:#3f5e76">/ НАЖМИТЕ НА ЧИСЛО ДЛЯ ИСТОРИИ</span></div>
     <div class="tiles">
       ${this._tile('pv_battery','Солнце → АКБ','Заряд от солнечных панелей','sun','solar')}
@@ -153,7 +174,7 @@ class EnergetikaCard extends HTMLElement {
     root.querySelectorAll('[data-key]').forEach(el=>{
       const open = e=>{e.stopPropagation();this._moreInfo(el.dataset.key);};
       el.addEventListener('click',open);
-      if (el.tagName.toLowerCase() !== 'button') el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open(e);}});
+      if (el.tagName.toLowerCase() !== 'button') el.addEventListener('keydown',e=>{if(e.target===el&&(e.key==='Enter'||e.key===' ')){e.preventDefault();open(e);}});
     });
     root.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>{
       this._batteryMode=button.dataset.mode;
@@ -163,7 +184,6 @@ class EnergetikaCard extends HTMLElement {
     const gridTimer=root.querySelector('[data-grid-timer]');
     const openDtek=event=>{event.stopPropagation();const panel=root.querySelector('energetika-automation-panel');panel.hass=this._hass;panel.open('dtek');};
     gridTimer.addEventListener('click',openDtek);
-    gridTimer.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openDtek(event);}});
     root.querySelector('energetika-alerts-panel').configure({entity:this.config?.alerts_entity,script:this.config?.alerts_script});
     const settings=root.querySelector('energetika-settings-panel');
     settings.configure({prefix:this.config?.settings_prefix||this._entities.mode_select.split('.')[1].replace(/output_source_priority$/,''),control:this._entities.control_mode});
@@ -280,7 +300,7 @@ class EnergetikaCard extends HTMLElement {
       title=`${absent?'Возвращение света по ориентиру ДТЭК':'Отключение по графику ДТЭК'}: ${at}. Время может измениться. Открыть график.`;
     }
     const timer=r.querySelector('[data-grid-timer]');timer.classList.toggle('scheduled',gridKnown&&deadline!==null);
-    timer.setAttribute('aria-label',`${label}. Открыть график ДТЭК`);r.querySelector('[data-grid-countdown]').textContent=label;r.querySelector('[data-grid-timer-title]').textContent=title;
+    timer.setAttribute('aria-label',`${label}. Открыть график ДТЭК`);r.querySelector('[data-grid-countdown]').textContent=label;timer.title=title;
   }
   _sourceContext() {
     const states=this._hass?.states||{},entity=this._entities.mode_select,native=states[entity];
