@@ -9,7 +9,7 @@ export function formatRuntime(minutes) {
   const total=Math.floor(minutes);
   return total===0?'0 мин':`${Math.floor(total/60)} ч ${String(total%60).padStart(2,'0')} мин`;
 }
-/* Energetika 2.12.2 — local Home Assistant card, no external dependencies. */
+/* Energetika 2.12.4 — local Home Assistant card, no external dependencies. */
 const ROOT = 'sensor.anenji_4200_protocol_1_';
 const SOURCE_MODES = [
   {code:'UTI', option:'Utility First (UTI)', description:'Сеть в приоритете'},
@@ -57,12 +57,7 @@ const VISUAL_LAYOUTS = {
     flows:{grid_battery:['M54 114V154',54,134],pv_battery:['M268 54H220V135H136V154',220,105],pv_load:['M350 114V154',350,134],grid_load:['M172 54H194V125C182 125 182 145 194 145V174H268',230,174],battery_load:['M172 211H268',220,211]},
     crossing:'M194 125C182 125 182 145 194 145',
   },
-  home:{
-    size:[720,500],
-    nodes:{grid:[18,130,174,132],solar:[395,34,205,112],battery:[236,274,172,132],load:[531,274,174,112]},
-    flows:{grid_battery:['M104 262V330H236',170,330],pv_battery:['M428 146V198H323V274',323,230],pv_load:['M540 146V218H618V274',618,238],grid_load:['M104 262V454H618V386',357,454],battery_load:['M408 330H531',469.5,330]},
-    crossing:'',
-  },
+
 };
 
 class EnergetikaCard extends HTMLElement {
@@ -104,37 +99,55 @@ class EnergetikaCard extends HTMLElement {
   _tile(key, title, subtitle, ic, color) {
     return `<button class="tile ${color}" data-key="${key}" title="Открыть историю: ${title}">${icon(ic)}<span class="tile-body"><span class="tile-title">${title}</span><strong>${value(key)}</strong><small>${subtitle}</small></span><span class="arrow">›</span></button>`;
   }
-  _houseScene() {
-    return `<svg class="house-scene" viewBox="0 0 720 500" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-      <defs><linearGradient id="house-roof" x2="1" y2="1"><stop stop-color="#365875"/><stop offset="1" stop-color="#14253a"/></linearGradient><linearGradient id="house-window" x2="0" y2="1"><stop stop-color="#ffdb8a"/><stop offset="1" stop-color="#c07b2b"/></linearGradient><radialGradient id="house-halo"><stop stop-color="#30bfa3" stop-opacity=".22"/><stop offset="1" stop-color="#081421" stop-opacity="0"/></radialGradient></defs>
-      <ellipse cx="365" cy="280" rx="280" ry="150" fill="url(#house-halo)"/>
-      <g stroke-linejoin="round">
-        <path d="M170 237 348 132 552 237 518 255 348 170 205 256Z" fill="url(#house-roof)" stroke="#557890" stroke-width="2"/>
-        <path d="M207 255v118h308V254L348 170Z" fill="#172f40" stroke="#426376" stroke-width="2"/>
-        <path d="M210 373h315" stroke="#557f82" stroke-width="3"/>
-        <path d="m287 195 63-35 111 57-64 36Z" fill="#17435f" stroke="#74a6ba" stroke-width="2"/>
-        <path d="m310 182 109 58m-84-72 109 59m-132-19 61-35m-33 50 62-35" stroke="#5988a0" stroke-width="2"/>
-        <rect x="222" y="279" width="47" height="58" rx="3" fill="url(#house-window)"/><path d="M245 279v58m-23-27h47" stroke="#27404e" stroke-width="4"/>
-        <rect x="451" y="279" width="43" height="58" rx="3" fill="url(#house-window)"/><path d="M472 279v58m-21-27h43" stroke="#27404e" stroke-width="4"/>
-        <rect x="326" y="286" width="48" height="87" rx="3" fill="#0b202f" stroke="#527b88" stroke-width="2"/><circle cx="364" cy="332" r="3" fill="#e2b96b"/>
-        <path d="M179 374h366" stroke="#436d69" stroke-width="4"/>
-      </g></svg>`;
+  _homeNode(key, name, ic, x, y, w, color, unit = 'Вт') {
+    return `<g class="node ${color}" data-key="${key}" role="button" tabindex="0" aria-label="${name}: открыть историю" transform="translate(${x} ${y})">
+      <rect class="node-bg" width="${w}" height="${['battery','grid'].includes(key) ? 132 : 112}" rx="16"/>
+      <svg x="12" y="22" width="38" height="44" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">${ICONS[ic]}</svg>
+      ${key==='grid'?'<g class="grid-cross" aria-hidden="true"><path d="M10 20 53 68M53 20 10 68"/></g>':''}
+      <text class="node-name" x="60" y="29">${name}</text>
+      <text class="node-value" x="60" y="59" data-value="${key}">—</text>
+      <text class="node-unit" x="60" y="79">${unit}</text>
+      <text class="node-metrics" x="12" y="100"><tspan data-key="${key==='battery'?'voltage':key+'_voltage'}" role="button" tabindex="0" aria-label="${name}: напряжение"><tspan data-value="${key==='battery'?'voltage':key+'_voltage'}">—</tspan> В</tspan><tspan dx="13" data-key="${key==='battery'?'current':key+'_current'}" role="button" tabindex="0" aria-label="${name}: ток">${key==='grid'?'≈ ':''}<tspan data-value="${key==='battery'?'current':key+'_current'}">—</tspan> А</tspan></text>
+      ${key==='battery'?'<text class="node-runtime" x="12" y="121" data-runtime>До 20% · —</text>':''}${key==='grid'?'<g class="grid-timer" data-grid-timer role="button" tabindex="0" aria-label="График отключений ДТЭК"><title data-grid-timer-title>Открыть график ДТЭК</title><rect x="8" y="108" width="158" height="18" rx="5"/><text x="14" y="121" data-grid-countdown>Срок не указан</text></g>':''}<path class="chev" d="m${w-18} 41 5 5-5 5"/>
+    </g>`;
+  }
+  _homeFlow(key, d, x, y, color, label) {
+    return `<g class="flow ${color}" data-flow="${key}"><path class="track" d="${d}"/><path class="wire" d="${d}"/><path class="moving" d="${d}" marker-end="url(#home-arrow-${color})"/>
+      <g class="flow-label" data-key="${key}" role="button" tabindex="0" aria-label="${label}: открыть историю" transform="translate(${x} ${y})"><rect x="-48" y="-19" width="96" height="38" rx="12"/><text y="7" text-anchor="middle"><tspan data-value="${key}">—</tspan><tspan class="flow-unit"> Вт</tspan></text></g></g>`;
+  }
+  _originalHomeDiagram() {
+    return `<svg class="house-diagram" viewBox="0 0 720 500" aria-label="Схема потоков энергии">
+      <defs>${['solar','grid','battery'].map(c=>`<marker id="home-arrow-${c}" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0 0 5 2.5 0 5Z" fill="var(--${c})"/></marker>`).join('')}
+      <linearGradient id="roof" x2="1" y2="1"><stop stop-color="#284361"/><stop offset="1" stop-color="#0c1829"/></linearGradient><linearGradient id="window" x2="0" y2="1"><stop stop-color="#ffc65e"/><stop offset="1" stop-color="#8e5b21"/></linearGradient><radialGradient id="halo"><stop stop-color="#22a891" stop-opacity=".12"/><stop offset="1" stop-color="#081421" stop-opacity="0"/></radialGradient></defs>
+      <ellipse cx="365" cy="280" rx="280" ry="150" fill="url(#halo)"/>
+      <g class="scene"><path d="M170 237 348 132 552 237 518 255 348 170 205 256Z" fill="url(#roof)" stroke="#3a5871"/><path d="M207 255v118h308V254L348 170Z" fill="#102232" stroke="#2e4b61"/><path d="M210 373h315" stroke="#46616b"/><path d="m287 195 63-35 111 57-64 36Z" fill="#12314a" stroke="#487896"/><path d="m310 182 109 58m-84-72 109 59m-132-19 61-35m-33 50 62-35" stroke="#36637f" stroke-width="2"/><rect x="222" y="279" width="47" height="58" rx="2" fill="url(#window)"/><path d="M245 279v58m-23-27h47" stroke="#233e4b" stroke-width="4"/><rect x="451" y="279" width="43" height="58" rx="2" fill="url(#window)"/><path d="M472 279v58m-21-27h43" stroke="#233e4b" stroke-width="4"/><path d="M179 374h366" stroke="#2a4c50" stroke-width="3"/></g>
+      ${this._homeFlow('pv_battery','M428 146V198H323V274',323,230,'solar','Солнце → АКБ')}
+      ${this._homeFlow('pv_load','M540 146V218H625V274',625,238,'solar','Солнце → нагрузка')}
+      ${this._homeFlow('grid_battery','M104 262V330H236',170,330,'grid','Сеть → АКБ')}
+      ${this._homeFlow('grid_load','M104 262V454H616V386',357,454,'grid','Сеть → нагрузка, байпас')}
+      ${this._homeFlow('battery_load','M408 330H531',469.5,330,'battery','АКБ → нагрузка')}
+      <text x="357" y="489" class="route-caption">СЕТЬ → ДОМ · БАЙПАС</text>
+      ${this._homeNode('grid','Сеть','grid',18,130,174,'grid')}
+      ${this._homeNode('solar','Солнце','sun',395,34,205,'solar')}
+      ${this._homeNode('battery','АКБ','battery',236,274,172,'battery','Вт·ч осталось')}
+      ${this._homeNode('load','Нагрузка','home',531,274,174,'home')}
+    </svg>`;
   }
   _applyVisualMode() {
-    const r=this.shadowRoot,layout=VISUAL_LAYOUTS[this._visualMode];
+    const r=this.shadowRoot,layout=VISUAL_LAYOUTS.minimal;
     const [boxWidth,boxHeight]=layout.size;
     r.querySelector('.shell').dataset.visual=this._visualMode;
     r.querySelector('svg.diagram').setAttribute('viewBox',`0 0 ${boxWidth} ${boxHeight}`);
     r.querySelectorAll('[data-visual-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.visualMode===this._visualMode)));
     for(const [key,[x,y,width,height=114]] of Object.entries(layout.nodes)){
-      const node=r.querySelector(`.node[data-key="${key}"]`);
+      const node=r.querySelector(`.diagram-stage>.node[data-key="${key}"]`);
       node.style.left=x/boxWidth*100+'%';node.style.top=y/boxHeight*100+'%';node.style.width=width/boxWidth*100+'%';
       node.style.height=height/boxHeight*100+'%';node.style.setProperty('--node-height',height/boxHeight*100+'%');
     }
     for(const [key,[path,x,y]] of Object.entries(layout.flows)){
-      const flow=r.querySelector(`g.flow[data-flow="${key}"]`);
+      const flow=r.querySelector(`svg.diagram>g.flow[data-flow="${key}"]`);
       flow.querySelectorAll('.track,.wire,.moving').forEach(line=>line.setAttribute('d',path));
-      const label=r.querySelector(`.flow-label[data-flow="${key}"]`);label.style.left=x/boxWidth*100+'%';label.style.top=y/boxHeight*100+'%';
+      const label=r.querySelector(`.diagram-stage>.flow-label[data-flow="${key}"]`);label.style.left=x/boxWidth*100+'%';label.style.top=y/boxHeight*100+'%';
     }
     r.querySelector('.crossing-gap').setAttribute('d',layout.crossing);
   }
@@ -202,22 +215,20 @@ class EnergetikaCard extends HTMLElement {
         .overview>.battery-summary{padding:5px 8px;display:grid;grid-template-columns:minmax(150px,1fr) minmax(180px,1.4fr) minmax(170px,1fr);grid-template-rows:minmax(0,1fr) auto;gap:2px 10px;border-radius:11px;min-height:0;line-height:1.1}.battery-main .plain-value{display:block;line-height:1}.battery-top{grid-column:1;grid-row:1/3;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;margin:0}.battery-title{font-size:11px;gap:4px}.battery-title .icon{width:16px;height:18px}.nameplate{font-size:8px;margin-left:2px}.mode-switch{padding:1px}.mode-switch button{font-size:9px;padding:3px 6px}.battery-layout{grid-column:2;grid-row:1;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:7px;align-items:center}.battery-main .plain-value strong{font-size:25px;line-height:1}.battery-main .capacity{font-size:8px;margin-top:1px}.battery-layout .mini>span{font-size:8px}.battery-layout .mini strong{font-size:18px}.voltage-limits{grid-column:2;grid-row:2;font-size:8px;gap:5px;margin:0}.voltage-limits .bar{height:4px}.battery-bottom{grid-column:3;grid-row:1/3;flex-direction:column;align-items:flex-end;justify-content:center;gap:4px;margin:0;font-size:8px}.battery-bottom .runtime{font-size:11px}.battery-spec{font-size:8px}.battery-estimate{font-size:9px;text-align:right}.overview-actions{margin-top:8px;gap:10px}.overview-actions>details{font-size:10px}.note,footer{display:none}
       }
       @media(orientation:landscape) and (min-width:640px) and (max-height:380px){.first-screen{height:calc(100dvh - 68px);min-height:280px;gap:4px}.overview{grid-template-rows:minmax(0,1fr) 66px;gap:4px 10px}.first-screen>header{min-height:24px}.first-screen>header h1{font-size:18px;line-height:24px}.diagram-stage>.node{padding:3px}.node-heading{min-height:14px}.node-symbol>.icon,.node-symbol>.grid-cross{width:14px;height:14px}.node-heading .node-name{font-size:11px}.node-reading .node-value{font-size:21px}.node>.node-metrics{font-size:12px}.node>.node-runtime{font-size:11px}.node>.grid-timer{font-size:10.5px}.flow-panel .tile-title{font-size:9px}.flow-panel .tile strong{font-size:19px}.overview>.battery-summary{padding:4px 7px}.battery-main .plain-value strong{font-size:23px}.battery-top{gap:2px}.mode-switch button{padding:2px 5px}}
-      .header-tools{display:flex;align-items:center;justify-content:flex-end;gap:10px;min-width:0}.visual-switch{display:flex;gap:2px;padding:3px;border:1px solid #2c4b61;border-radius:10px;background:#091a29;flex-shrink:0}.visual-switch button{display:flex;align-items:center;justify-content:center;gap:5px;min-height:29px;padding:4px 10px;border:0;border-radius:7px;background:transparent;color:#89a8bc;font-size:11px;white-space:nowrap;touch-action:manipulation}.visual-switch button svg{width:14px;height:14px;flex-shrink:0}.visual-switch button[aria-pressed=true]{color:#d9fff4;background:#17443f;box-shadow:inset 0 0 0 1px #2a7968}.visual-switch button:hover{color:#e2fff6}.house-scene{position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none}.shell[data-visual=home] .house-scene{display:block}.shell[data-visual=home] .diagram-stage{background:radial-gradient(ellipse at 56% 54%,#173d451f,transparent 68%)}
+      .header-tools{display:flex;align-items:center;justify-content:flex-end;gap:10px;min-width:0}.visual-switch{display:flex;gap:2px;padding:3px;border:1px solid #2c4b61;border-radius:10px;background:#091a29;flex-shrink:0}.visual-switch button{display:flex;align-items:center;justify-content:center;gap:5px;min-height:29px;padding:4px 10px;border:0;border-radius:7px;background:transparent;color:#89a8bc;font-size:11px;white-space:nowrap;touch-action:manipulation}.visual-switch button svg{width:14px;height:14px;flex-shrink:0}.visual-switch button[aria-pressed=true]{color:#d9fff4;background:#17443f;box-shadow:inset 0 0 0 1px #2a7968}.visual-switch button:hover{color:#e2fff6}
       @media(max-width:750px){.header-tools{gap:6px}.header-tools .live{width:19px;height:19px;justify-content:center;padding:0}.header-tools [data-live-text]{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.visual-switch{padding:2px;border-radius:8px}.visual-switch button{min-height:27px;padding:3px 7px;font-size:10px;gap:4px}.visual-switch button svg{width:12px;height:12px}}
       @media(max-width:390px){.header-tools{gap:4px}.visual-switch button{padding:3px 5px;gap:3px}.visual-switch button svg{display:none}}
-      @media(orientation:landscape) and (min-width:640px) and (max-height:600px){.header-tools{position:absolute;top:5px;left:145px;right:auto;gap:0}.header-tools .live{display:none}.visual-switch{padding:1px;border-radius:7px}.visual-switch button{min-height:24px;padding:2px 7px;font-size:10px;gap:4px}.visual-switch button svg{width:12px;height:12px}.shell[data-visual=home] .diagram-stage>.node{height:38%!important}.shell[data-visual=home] .node>.node-metrics{gap:4px}}
-      /* The Home view follows the original house scene, with a wider battery-to-load gap. */
-      .home-route-caption{display:none;fill:#68869d;font-size:12px;letter-spacing:2px;text-anchor:middle}.shell[data-visual=home] .home-route-caption{display:block}.shell[data-visual=home] .house-scene{opacity:.45}.shell[data-visual=home] .diagram-stage{height:clamp(310px,38dvh,340px);min-height:310px;max-height:none;aspect-ratio:auto}
-      .shell[data-visual=home] .diagram-stage>.node{height:var(--node-height)!important;padding:4px;gap:1px;border-radius:12px}.shell[data-visual=home] .node-heading{min-height:14px;gap:4px}.shell[data-visual=home] .node-heading .node-name{font-size:11px}.shell[data-visual=home] .node-symbol>.icon,.shell[data-visual=home] .node-symbol>.grid-cross{width:14px;height:14px}.shell[data-visual=home] .node-chevron{display:none}.shell[data-visual=home] .node-reading{flex-wrap:wrap;gap:0 3px}.shell[data-visual=home] .node-reading .node-value{font-size:22px;line-height:1}.shell[data-visual=home] .node-reading .node-unit{width:100%;font-size:8px;line-height:1.1}.shell[data-visual=home] .node>.node-metrics{font-size:9.5px;line-height:1.1;gap:4px}.shell[data-visual=home] .node>.node-runtime{font-size:9px;line-height:1.1}.shell[data-visual=home] .node>.grid-timer{font-size:8.5px;line-height:1.1;padding:1px 2px;border-radius:4px}.shell[data-visual=home] .diagram-stage>.flow-label{min-width:40px;font-size:12px;padding:4px 5px}.shell[data-visual=home] .flow-label .flow-unit{font-size:9px}
-      @media(max-width:750px){.shell[data-visual=home] .diagram-stage{height:310px;min-height:310px}}
-      @media(max-width:390px){.shell[data-visual=home] .node-reading .node-value{font-size:20px}.shell[data-visual=home] .node>.node-metrics{font-size:9px;gap:3px}.shell[data-visual=home] .node>.node-runtime{font-size:8.5px}.shell[data-visual=home] .node>.grid-timer{font-size:8px}.shell[data-visual=home] .diagram-stage>.flow-label{min-width:36px;font-size:11px;padding:4px}}
-      @media(orientation:landscape) and (min-width:640px) and (max-height:600px){.shell[data-visual=home] .diagram-stage{height:100%;min-height:0}.shell[data-visual=home] .diagram-stage>.node{min-height:50px;padding:2px;gap:0;border-radius:8px}.shell[data-visual=home] .diagram-stage>.node[data-key=battery],.shell[data-visual=home] .diagram-stage>.node[data-key=grid]{min-height:60px}.shell[data-visual=home] .node-heading{min-height:12px;gap:3px}.shell[data-visual=home] .node-heading .node-name{font-size:10px}.shell[data-visual=home] .node-symbol>.icon,.shell[data-visual=home] .node-symbol>.grid-cross{width:12px;height:12px}.shell[data-visual=home] .node-reading{flex-wrap:nowrap;gap:2px}.shell[data-visual=home] .node-reading .node-value{font-size:18px}.shell[data-visual=home] .node-reading .node-unit{width:auto;font-size:8px}.shell[data-visual=home] .node>.node-metrics{font-size:8.5px;gap:3px}.shell[data-visual=home] .node>.node-runtime{font-size:8.5px}.shell[data-visual=home] .node>.grid-timer{font-size:8px;padding:0 2px}.shell[data-visual=home] .diagram-stage>.flow-label{min-width:32px;padding:2px 3px;font-size:10px}.shell[data-visual=home] .flow-label .flow-unit{font-size:8px}}
+      @media(orientation:landscape) and (min-width:640px) and (max-height:600px){.header-tools{position:absolute;top:5px;left:145px;right:auto;gap:0}.header-tools .live{display:none}.visual-switch{padding:1px;border-radius:7px}.visual-switch button{min-height:24px;padding:2px 7px;font-size:10px;gap:4px}.visual-switch button svg{width:12px;height:12px}}
+      .original-home-stage{display:none;position:absolute;inset:0}.house-diagram{display:block;width:100%;height:100%;overflow:visible}.shell[data-visual=home] .original-home-stage{display:block}.shell[data-visual=home] .diagram-stage>.diagram,.shell[data-visual=home] .diagram-stage>.node,.shell[data-visual=home] .diagram-stage>.flow-label,.shell[data-visual=home] .house-scene{display:none}.shell[data-visual=home] .diagram-stage{height:auto;min-height:0;aspect-ratio:720/500;background:none}.house-diagram .node-name{font-size:17px}.house-diagram .node-value{font-size:26px}.house-diagram .node-unit{font-size:13px}.house-diagram .node-metrics{font-size:11px}.house-diagram .node-runtime{font-size:10px}.house-diagram .flow-label text{font-size:19px}.house-diagram .flow-unit{font-size:13px}
+      .shell[data-visual=home] .house-diagram .node>.node-metrics{display:inline;font-size:11px}.shell[data-visual=home] .house-diagram .node>.node-runtime{font-size:10px}.shell[data-visual=home] .house-diagram .grid-timer{display:inline}.shell[data-visual=home] .house-diagram .flow-label .flow-unit{font-size:13px}
+      @media(min-width:800px){.shell[data-visual=home] .diagram-stage{height:clamp(280px,38dvh,340px);aspect-ratio:auto}}
+      @media(orientation:landscape) and (min-width:640px) and (max-height:600px){.shell[data-visual=home] .diagram-stage{height:100%;min-height:0;aspect-ratio:auto}}
     </style>
     <ha-card class="shell"><div class="first-screen"><header><div class="energy-heading"><div class="eyebrow">МОЙ ДОМ · ANENJI 4200</div><h1>Энергетика</h1><div class="sub">Солнце, сеть и энергия вашего дома</div></div><div class="header-tools"><div class="visual-switch" role="group" aria-label="Вид энергомониторинга"><button data-visual-mode="minimal" aria-pressed="true" title="Крупные плитки и простая схема"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2" y="2" width="4" height="4" rx="1"/><rect x="10" y="2" width="4" height="4" rx="1"/><rect x="2" y="10" width="4" height="4" rx="1"/><rect x="10" y="10" width="4" height="4" rx="1"/></svg>Минимализм</button><button data-visual-mode="home" aria-pressed="false" title="Дом и анимированные потоки энергии"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="m1 7 7-6 7 6M3 6v9h4v-5h3v5h3V6"/></svg>Дом</button></div><span class="live" data-live><span class="dot"></span><span data-live-text>Подключение</span></span></div></header>
     <div class="overview">
     <div class="diagram-wrap"><div class="diagram-toolbar"><energetika-alerts-panel></energetika-alerts-panel><button class="settings-gear" data-settings-open aria-label="Настройки инвертора" title="Настройки инвертора"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 3-.6 2.1-1.5.9-2.1-.5-2 3.5 1.5 1.6v1.8L2.8 14l2 3.5 2.1-.5 1.5.9L9 20h4l.6-2.1 1.5-.9 2.1.5 2-3.5-1.5-1.6v-1.8L19.2 9l-2-3.5-2.1.5-1.5-.9L13 3Z"/><circle cx="11" cy="11.5" r="3.2"/></svg></button><div class="inverter-mode"><button class="source-trigger" data-source-open aria-haspopup="dialog" aria-expanded="false"><span>Режим</span><strong data-source-current>—</strong><span class="caret">⌄</span></button><div class="mode-popover" data-source-popover role="dialog" aria-label="Режим питания инвертора" hidden><div class="mode-heading">Приоритет питания<button class="mode-close" data-source-close aria-label="Закрыть выбор режима">×</button></div><div class="source-options" data-source-options role="group" aria-label="Доступные режимы"></div><div class="mode-message" data-source-message role="status"></div><p class="mode-note" data-source-note hidden>Переключение изменит источник питания дома.</p><button class="mode-apply" data-source-apply disabled>Применить режим</button><button class="mode-setting-link" data-settings-link>Все настройки инвертора →</button></div></div>
     </div><div class="diagram-stage">
-    ${this._houseScene()}
+    <div class="original-home-stage">${this._originalHomeDiagram()}</div>
     <svg class="diagram" viewBox="0 0 440 300" preserveAspectRatio="none" aria-label="Направления потоков энергии">
       <defs>${['solar','grid','battery'].map(c=>`<marker id="arrow-${c}" markerWidth="4" markerHeight="4" refX="3.5" refY="2" orient="auto"><path d="M0 0 4 2 0 4Z" fill="var(--${c})"/></marker>`).join('')}</defs>
       ${this._flow('grid_battery','M54 114V154','grid')}
@@ -225,7 +236,6 @@ class EnergetikaCard extends HTMLElement {
       ${this._flow('pv_load','M350 114V154','solar')}
       ${this._flow('grid_load','M172 54H194V125C182 125 182 145 194 145V174H268','grid')}
       ${this._flow('battery_load','M172 211H268','battery')}
-      <text class="home-route-caption" x="357" y="489">СЕТЬ → ДОМ · БАЙПАС</text>
     </svg>
       ${this._node('grid','Сеть','grid',8,0,164,'grid')}
       ${this._node('solar','Солнце','sun',268,0,164,'solar')}
@@ -277,9 +287,11 @@ class EnergetikaCard extends HTMLElement {
       this._update();
     }));
     this._applyVisualMode();
-    const gridTimer=root.querySelector('[data-grid-timer]');
     const openDtek=event=>{event.stopPropagation();const panel=root.querySelector('energetika-data-panel');panel.hass=this._hass;panel.open('dtek');};
-    gridTimer.addEventListener('click',openDtek);
+    root.querySelectorAll('[data-grid-timer]').forEach(timer=>{
+      timer.addEventListener('click',openDtek);
+      if(timer.tagName.toLowerCase()!=='button')timer.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openDtek(event);}});
+    });
     root.querySelector('energetika-alerts-panel').configure({entity:this.config?.alerts_entity,script:this.config?.alerts_script});
     const settings=root.querySelector('energetika-settings-panel');
     settings.configure({prefix:this.config?.settings_prefix||this._entities.mode_select.split('.')[1].replace(/output_source_priority$/,''),control:this._entities.control_mode});
@@ -379,11 +391,13 @@ class EnergetikaCard extends HTMLElement {
   }
   _updateGrid() {
     if(!this._hass||!this.shadowRoot.firstChild)return;
-    const r=this.shadowRoot,states=this._hass.states,grid=r.querySelector('.node[data-key="grid"]');
+    const r=this.shadowRoot,states=this._hass.states;
     const connected=this._hass.connected!==false,gridState=states[this._entities.grid_present]?.state;
     const gridKnown=connected&&this._number('grid_voltage')!==null&&['on','off'].includes(gridState),absent=gridKnown&&gridState==='off';
-    grid.classList.toggle('grid-absent',absent);grid.querySelector('.node-unit').textContent=absent?'СЕТИ НЕТ':'Вт';
-    grid.setAttribute('aria-label',absent?'Сеть отсутствует: открыть историю':'Сеть: открыть историю');
+    r.querySelectorAll('.node[data-key="grid"]').forEach(grid=>{
+      grid.classList.toggle('grid-absent',absent);grid.querySelector('.node-unit').textContent=absent?'СЕТИ НЕТ':'Вт';
+      grid.setAttribute('aria-label',absent?'Сеть отсутствует: открыть историю':'Сеть: открыть историю');
+    });
     const dtek=states[this._entities.dtek_status],a=dtek?.attributes||{},now=Date.now()/1000;
     const age=now-Number(a.last_success),fresh=connected&&a.fresh===true&&!a.error&&Number.isFinite(age)&&age>=0&&age<900&&!['unknown','unavailable','stale','not_configured'].includes(dtek?.state);
     const rawDeadline=Number(a[absent?'restoration_at':'next_outage_at']);
@@ -398,8 +412,11 @@ class EnergetikaCard extends HTMLElement {
       else label=absent?'Срок прошёл · ждём':'Отключение ожидается';
       title=`${absent?'Возвращение света по ориентиру ДТЭК':'Отключение по графику ДТЭК'}: ${at}. Время может измениться. Открыть график.`;
     }
-    const timer=r.querySelector('[data-grid-timer]');timer.classList.toggle('scheduled',gridKnown&&deadline!==null);
-    timer.setAttribute('aria-label',`${label}. Открыть график ДТЭК`);r.querySelector('[data-grid-countdown]').textContent=label;timer.title=title;
+    r.querySelectorAll('[data-grid-timer]').forEach(timer=>{
+      timer.classList.toggle('scheduled',gridKnown&&deadline!==null);timer.setAttribute('aria-label',`${label}. Открыть график ДТЭК`);timer.title=title;
+      timer.querySelector('[data-grid-countdown]').textContent=label;
+      const svgTitle=timer.querySelector('[data-grid-timer-title]');if(svgTitle)svgTitle.textContent=title;
+    });
   }
   _sourceContext() {
     const states=this._hass?.states||{},entity=this._entities.mode_select,native=states[entity];
