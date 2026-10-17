@@ -1,7 +1,7 @@
-import './energetika-history.js?v=2.7.1';
-import './energetika-settings.js?v=2.7.1';
-import './energetika-automation.js?v=2.7.1';
-import './energetika-alerts.js?v=2.7.1';
+import './energetika-history.js?v=2.8.0';
+import './energetika-settings.js?v=2.8.0';
+import './energetika-automation.js?v=2.8.0';
+import './energetika-alerts.js?v=2.8.0';
 
 export function formatRuntime(minutes) {
   if (!Number.isFinite(minutes) || minutes < 0) return '—';
@@ -71,6 +71,7 @@ class EnergetikaCard extends HTMLElement {
     return `<g class="node ${color}" data-key="${key}" role="button" tabindex="0" aria-label="${name}: открыть историю" transform="translate(${x} ${y})">
       <rect class="node-bg" width="${w}" height="${key === 'battery' ? 132 : 112}" rx="16"/>
       <svg x="12" y="22" width="38" height="44" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">${ICONS[ic]}</svg>
+      ${key==='grid'?'<g class="grid-cross" aria-hidden="true"><path d="M10 20 53 68M53 20 10 68"/></g>':''}
       <text class="node-name" x="60" y="29">${name}</text>
       <text class="node-value" x="60" y="59" data-value="${key}">—</text>
       <text class="node-unit" x="60" y="79">${unit}</text>
@@ -106,6 +107,7 @@ class EnergetikaCard extends HTMLElement {
       .settings-gear{position:absolute;right:5px;top:8px;z-index:3;width:34px;height:34px;display:grid;place-items:center;padding:7px;border:1px solid #33546d;border-radius:10px;background:#102439dc;color:#92b4cc;box-shadow:0 3px 14px #0003}.settings-gear:hover{color:#90e7df;border-color:#41aaa6}.settings-gear svg{width:20px;height:20px}.source-row{display:flex;align-items:center;gap:5px}.source-row .source-option{flex:1;min-width:0}.source-info{width:25px;height:25px;flex-shrink:0;padding:0;border:1px solid #3a6177;border-radius:50%;background:#153144;color:#87cddd;font:bold 14px Georgia,serif}.mode-setting-link{display:block;margin-top:9px;width:100%;padding:6px;background:none;border:0;color:#7ba9c1;font-size:10px}@media(max-width:520px){.settings-gear{right:3px;top:5px;width:29px;height:29px;padding:5px;border-radius:8px}.settings-gear svg{width:18px;height:18px}}
       .voltage-reference{display:flex;align-items:center;gap:5px;color:#71929f;font-size:9px;margin-top:5px}.voltage-reference button{font:inherit;border:0;background:none;padding:0}.voltage-reference .voltage-max{margin-left:0}@media(max-width:520px){.voltage-reference{font-size:8px;margin-top:3px}}
       energetika-alerts-panel{position:absolute;left:28%;top:8px;z-index:3}@media(max-width:520px){energetika-alerts-panel{left:34%;top:5px}}
+      .grid-cross{display:none;fill:none;stroke:#ff4263;stroke-width:6;stroke-linecap:round;filter:drop-shadow(0 0 4px #ff1744)}.grid-absent .grid-cross{display:block}.grid-absent .node-bg{fill:#2c101d;stroke:#ff526f;stroke-width:2.6}.grid-absent .node-unit{fill:#ff8ca1;font-weight:750}.grid-absent .node-name{fill:#ffb4c1}
     </style>
     <ha-card class="shell"><header><div><div class="eyebrow">МОЙ ДОМ · ANENJI 4200</div><h1>Энергетика</h1><div class="sub">Солнце, сеть и энергия вашего дома</div></div><span class="live" data-live><span class="dot"></span><span data-live-text>Подключение</span></span></header>
     <div class="diagram-wrap"><energetika-alerts-panel></energetika-alerts-panel><button class="settings-gear" data-settings-open aria-label="Настройки инвертора" title="Настройки инвертора"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 3-.6 2.1-1.5.9-2.1-.5-2 3.5 1.5 1.6v1.8L2.8 14l2 3.5 2.1-.5 1.5.9L9 20h4l.6-2.1 1.5-.9 2.1.5 2-3.5-1.5-1.6v-1.8L19.2 9l-2-3.5-2.1.5-1.5-.9L13 3Z"/><circle cx="11" cy="11.5" r="3.2"/></svg></button><div class="inverter-mode"><button class="source-trigger" data-source-open aria-haspopup="dialog" aria-expanded="false"><span>Режим</span><strong data-source-current>—</strong><span class="caret">⌄</span></button><div class="mode-popover" data-source-popover role="dialog" aria-label="Режим питания инвертора" hidden><div class="mode-heading">Приоритет питания<button class="mode-close" data-source-close aria-label="Закрыть выбор режима">×</button></div><div class="source-options" data-source-options role="group" aria-label="Доступные режимы"></div><div class="mode-message" data-source-message role="status"></div><p class="mode-note" data-source-note hidden>Переключение изменит источник питания дома.</p><button class="mode-apply" data-source-apply disabled>Применить режим</button><button class="mode-setting-link" data-settings-link>Все настройки инвертора →</button></div></div>
@@ -186,6 +188,8 @@ class EnergetikaCard extends HTMLElement {
     r.querySelector('energetika-settings-panel').hass=this._hass;
     r.querySelector('energetika-automation-panel').hass=this._hass;
     this._updateSourceMode();
+    const gridNode=r.querySelector('.node[data-key="grid"]'),gridAbsent=this._hass.connected!==false&&states['binary_sensor.energetika_grid_present']?.state==='off'&&this._number('grid_voltage')!==null;
+    gridNode.classList.toggle('grid-absent',gridAbsent);gridNode.querySelector('.node-unit').textContent=gridAbsent?'СЕТИ НЕТ':'Вт';gridNode.setAttribute('aria-label',gridAbsent?'Сеть отсутствует: открыть историю':'Сеть: открыть историю');
     r.querySelectorAll('[data-value]').forEach(el=>{
       const key=el.dataset.value,n=this._number(key);
       const digits=/voltage|current|percent/.test(key)?1:0;

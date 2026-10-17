@@ -1,0 +1,10 @@
+{
+  "domain": "energetika_dtek",
+  "name": "Energetika · DTEK Odesa",
+  "version": "2.8.0",
+  "documentation": "https://github.com/Termenafter20012/ha-energetika-anenji",
+  "codeowners": [],
+  "dependencies": ["sensor"],
+  "iot_class": "cloud_polling",
+  "requirements": []
+}

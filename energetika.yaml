@@ -6,7 +6,36 @@ input_button:
     name: "Энергетика · АКБ полностью заряжена"
     icon: mdi:battery-check
 
+# Separate local component; addresses and cookies are never stored in this file.
+energetika_dtek: {}
+
 template:
+  - sensor:
+      - name: Energetika Outage Energy Required
+        unique_id: energetika_outage_energy_required
+        default_entity_id: sensor.energetika_outage_energy_required
+        unit_of_measurement: Wh
+        device_class: energy
+        availability: >-
+          {{ is_state('binary_sensor.energetika_grid_present', 'off')
+             and state_attr('sensor.energetika_dtek_status', 'fresh') == true
+             and state_attr('sensor.energetika_dtek_status', 'restoration_at') | float(0) > as_timestamp(now())
+             and has_value('sensor.anenji_4200_protocol_1_battery_power')
+             and as_timestamp(now()) - as_timestamp(states.sensor.anenji_4200_protocol_1_battery_power.last_reported, 0) < 120 }}
+        state: >-
+          {% set hours = (state_attr('sensor.energetika_dtek_status', 'restoration_at') | float(0) - as_timestamp(now())) / 3600 %}
+          {% set discharge = [0, -(states('sensor.anenji_4200_protocol_1_battery_power') | float(0))] | max %}
+          {{ ([0, hours] | max * discharge) | round(0) }}
+        attributes:
+          model: Current net battery power held constant; no future solar or load changes assumed
+          reserve_wh: 512
+      - name: Energetika Outage Energy Margin
+        unique_id: energetika_outage_energy_margin
+        default_entity_id: sensor.energetika_outage_energy_margin
+        unit_of_measurement: Wh
+        device_class: energy
+        availability: "{{ has_value('sensor.energetika_outage_energy_required') and has_value('sensor.energetika_battery_remaining') }}"
+        state: "{{ (states('sensor.energetika_battery_remaining') | float(0) - 512 - states('sensor.energetika_outage_energy_required') | float(0)) | round(0) }}"
   - binary_sensor:
       - name: Energetika Grid Present
         unique_id: energetika_grid_present
@@ -588,7 +617,7 @@ template:
 # Public Odesa city centre, not the private coordinates of the installation.
 rest:
   - resource: "https://api.open-meteo.com/v1/forecast?latitude=46.4825&longitude=30.7233&current=temperature_2m,relative_humidity_2m,cloud_cover,weather_code,is_day,wind_speed_10m&hourly=shortwave_radiation,temperature_2m,cloud_cover,weather_code,is_day&daily=shortwave_radiation_sum,weather_code,temperature_2m_min,temperature_2m_max&timezone=Europe%2FKyiv&timeformat=unixtime&forecast_days=7"
-    scan_interval: 900
+    scan_interval: 300
     timeout: 20
     sensor:
       - name: Energetika Solar Weather
@@ -782,6 +811,24 @@ script:
           value: "Ожидание устойчивых условий."
 
 automation:
+  - id: energetika_weather_recovery
+    alias: "Энергетика · Восстановить погоду после потери интернета"
+    mode: single
+    max_exceeded: silent
+    triggers:
+      - trigger: time_pattern
+        minutes: "/1"
+    conditions:
+      - condition: template
+        value_template: >-
+          {% set c = state_attr('sensor.energetika_solar_weather', 'current') or {} %}
+          {{ not has_value('sensor.energetika_solar_weather')
+             or as_timestamp(now()) - c.get('time', 0) | float(0) > 1200 }}
+    actions:
+      - action: homeassistant.update_entity
+        continue_on_error: true
+        target:
+          entity_id: sensor.energetika_solar_weather
   - id: energetika_grid_notifications
     alias: "Энергетика · Сеть пропала или восстановилась"
     mode: single
