@@ -7,6 +7,32 @@ input_button:
     icon: mdi:battery-check
 
 template:
+  - binary_sensor:
+      - name: Energetika Grid Present
+        unique_id: energetika_grid_present
+        default_entity_id: binary_sensor.energetika_grid_present
+        device_class: power
+        availability: >-
+          {{ has_value('sensor.anenji_4200_protocol_1_grid_voltage')
+             and 0 <= states('sensor.anenji_4200_protocol_1_grid_voltage') | float(-1) <= 300
+             and as_timestamp(now()) - as_timestamp(states.sensor.anenji_4200_protocol_1_grid_voltage.last_reported, 0) < 120 }}
+        state: >-
+          {% set v = states('sensor.anenji_4200_protocol_1_grid_voltage') | float(-1) %}
+          {{ v >= 90 or (v > 50 and this.state == 'on') }}
+        delay_on: "00:00:05"
+        delay_off: "00:00:05"
+    sensor:
+      - name: Energetika Notification Devices
+        unique_id: energetika_notification_devices
+        default_entity_id: sensor.energetika_notification_devices
+        state: "{{ integration_entities('mobile_app') | select('match', '^notify[.]') | list | count }}"
+        attributes:
+          devices: >-
+            {% set ns = namespace(rows=[]) %}
+            {% for e in integration_entities('mobile_app') if e.startswith('notify.') %}
+              {% set ns.rows = ns.rows + [dict(entity=e, name=state_attr(e, 'friendly_name') or e)] %}
+            {% endfor %}
+            {{ ns.rows }}
   # Persistent SMG alarm episodes. Missing data never resolves an alarm.
   # Keep up to 100 episodes, prioritising all open ones (at most 64 mask bits).
   # Compact timestamps keep attributes below Recorder's 16 KiB limit.
@@ -561,7 +587,7 @@ template:
 
 # Public Odesa city centre, not the private coordinates of the installation.
 rest:
-  - resource: "https://api.open-meteo.com/v1/forecast?latitude=46.4825&longitude=30.7233&current=temperature_2m,relative_humidity_2m,cloud_cover,weather_code,is_day,wind_speed_10m&hourly=shortwave_radiation&daily=shortwave_radiation_sum,weather_code,temperature_2m_min,temperature_2m_max&timezone=Europe%2FKyiv&timeformat=unixtime&forecast_days=7"
+  - resource: "https://api.open-meteo.com/v1/forecast?latitude=46.4825&longitude=30.7233&current=temperature_2m,relative_humidity_2m,cloud_cover,weather_code,is_day,wind_speed_10m&hourly=shortwave_radiation,temperature_2m,cloud_cover,weather_code,is_day&daily=shortwave_radiation_sum,weather_code,temperature_2m_min,temperature_2m_max&timezone=Europe%2FKyiv&timeformat=unixtime&forecast_days=7"
     scan_interval: 900
     timeout: 20
     sensor:
@@ -604,6 +630,12 @@ sensor:
     precision: 0
 
 input_boolean:
+  energetika_notify_grid:
+    name: "Энергетика · Уведомления о сети"
+    icon: mdi:transmission-tower
+  energetika_notify_modes:
+    name: "Энергетика · Уведомления о SBU/SUB"
+    icon: mdi:cellphone-message
   # No initial: false: a new installation is off; HA restores the owner's choice.
   energetika_solar_auto:
     name: "Энергетика · Автоматический SBU/SUB"
@@ -659,11 +691,45 @@ input_datetime:
     has_time: true
 
 input_text:
+  energetika_notification_target:
+    name: "Энергетика · Телефон для уведомлений"
+    max: 128
   energetika_solar_result:
     name: "Энергетика · Результат переключения"
     max: 255
 
+input_select:
+  # No initial: restore the last confirmed state; first observation is silent.
+  energetika_grid_last_confirmed:
+    name: "Энергетика · Подтверждённое состояние сети"
+    options: [unknown, present, absent]
+    icon: mdi:transmission-tower
+
 script:
+  energetika_phone_notify:
+    alias: "Энергетика · Уведомление на выбранный телефон"
+    mode: queued
+    max: 20
+    fields:
+      title:
+        required: true
+        selector:
+          text:
+      message:
+        required: true
+        selector:
+          text:
+    sequence:
+      - variables:
+          phone: "{{ states('input_text.energetika_notification_target') }}"
+      - condition: template
+        value_template: "{{ phone.startswith('notify.') and phone in integration_entities('mobile_app') }}"
+      - action: notify.send_message
+        target:
+          entity_id: "{{ phone }}"
+        data:
+          title: "{{ title }}"
+          message: "{{ message }}"
   energetika_alarm_journal:
     alias: "Энергетика · Запись журнала ошибок"
     description: "Отметить, скрыть или восстановить запись. Команд инвертору не отправляет."
@@ -716,6 +782,49 @@ script:
           value: "Ожидание устойчивых условий."
 
 automation:
+  - id: energetika_grid_notifications
+    alias: "Энергетика · Сеть пропала или восстановилась"
+    mode: single
+    max_exceeded: silent
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.energetika_grid_present
+        to: ["on", "off"]
+        for: "00:00:10"
+      - trigger: time_pattern
+        seconds: "/15"
+      - trigger: homeassistant
+        event: start
+    conditions:
+      - condition: template
+        value_template: >-
+          {{ states('binary_sensor.energetika_grid_present') in ['on', 'off']
+             and as_timestamp(now()) - as_timestamp(states.binary_sensor.energetika_grid_present.last_changed, 0) >= 10
+             and has_value('sensor.anenji_4200_protocol_1_grid_voltage')
+             and as_timestamp(now()) - as_timestamp(states.sensor.anenji_4200_protocol_1_grid_voltage.last_reported, 0) < 120 }}
+    actions:
+      - variables:
+          previous: "{{ states('input_select.energetika_grid_last_confirmed') }}"
+          current: "{{ 'present' if is_state('binary_sensor.energetika_grid_present', 'on') else 'absent' }}"
+      - condition: template
+        value_template: "{{ previous != current }}"
+      # Update before notifying: a failed push never causes a notification loop.
+      - action: input_select.select_option
+        target:
+          entity_id: input_select.energetika_grid_last_confirmed
+        data:
+          option: "{{ current }}"
+      - condition: template
+        value_template: "{{ previous in ['present', 'absent'] and is_state('input_boolean.energetika_notify_grid', 'on') }}"
+      - action: script.energetika_phone_notify
+        continue_on_error: true
+        data:
+          title: "{{ 'Энергетика · Свет появился' if current == 'present' else 'Энергетика · Свет пропал' }}"
+          message: >-
+            {{ now().strftime('%d.%m %H:%M') }} ·
+            {{ 'Сеть восстановлена' if current == 'present' else 'На входе инвертора пропала сеть' }}.
+            Напряжение: {{ states('sensor.anenji_4200_protocol_1_grid_voltage') | float(0) | round(1) }} В.
+            АКБ: {{ states('sensor.energetika_battery_percent_energy') }}%.
   - id: energetika_solar_defaults_once
     alias: "Энергетика · Первичная настройка автоматики"
     triggers:
@@ -791,6 +900,8 @@ automation:
       - variables:
           target_mode: "{{ 'Solar-Battery-Utility (SBU)' if is_state('sensor.energetika_solar_strategy', 'SBU') else 'Solar-Utility-Battery (SUB)' }}"
           target_code: "{{ states('sensor.energetika_solar_strategy') }}"
+          previous_mode: "{{ states('select.anenji_4200_protocol_1_output_source_priority').split('(')[-1].replace(')', '') }}"
+          decision_reason: "{{ state_attr('sensor.energetika_solar_strategy', 'reason') }}"
       - condition: template
         value_template: >-
           {{ target_mode in (state_attr('select.anenji_4200_protocol_1_output_source_priority', 'options') or [])
@@ -823,6 +934,16 @@ automation:
               entity_id: input_text.energetika_solar_result
             data:
               value: "{{ now().strftime('%d.%m %H:%M') }} · Инвертор подтвердил {{ target_code }}."
+          - if: "{{ is_state('input_boolean.energetika_notify_modes', 'on') }}"
+            then:
+              - action: script.energetika_phone_notify
+                continue_on_error: true
+                data:
+                  title: "Энергетика · Автоматика включила {{ target_code }}"
+                  message: >-
+                    {{ now().strftime('%d.%m %H:%M') }} · {{ previous_mode }} → {{ target_code }}.
+                    {{ decision_reason }} PV: {{ states('sensor.energetika_pv_average') }} Вт;
+                    АКБ: {{ states('sensor.energetika_battery_percent_energy') }}%.
         else:
           - action: input_boolean.turn_on
             target:
@@ -832,3 +953,12 @@ automation:
               entity_id: input_text.energetika_solar_result
             data:
               value: "{{ now().strftime('%d.%m %H:%M') }} · {{ target_code }} не подтверждён. Автоматика остановлена; проверьте режим и нажмите «Возобновить»."
+          - if: "{{ is_state('input_boolean.energetika_notify_modes', 'on') }}"
+            then:
+              - action: script.energetika_phone_notify
+                continue_on_error: true
+                data:
+                  title: "Энергетика · Автоматика остановлена"
+                  message: >-
+                    {{ now().strftime('%d.%m %H:%M') }} · Переход на {{ target_code }} не подтверждён.
+                    Проверьте фактический режим в панели и нажмите «Возобновить».
