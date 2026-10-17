@@ -1,6 +1,6 @@
 import './energetika-history.js?v=2.8.0';
 import './energetika-settings.js?v=2.8.0';
-import './energetika-automation.js?v=2.8.0';
+import './energetika-automation.js?v=2.8.2';
 import './energetika-alerts.js?v=2.8.0';
 
 export function formatRuntime(minutes) {
@@ -8,7 +8,7 @@ export function formatRuntime(minutes) {
   const total=Math.floor(minutes);
   return total===0?'0 мин':`${Math.floor(total/60)} ч ${String(total%60).padStart(2,'0')} мин`;
 }
-/* Energetika 2.8.1 — local Home Assistant card, no external dependencies. */
+/* Energetika 2.8.2 — local Home Assistant card, no external dependencies. */
 const ROOT = 'sensor.anenji_4200_protocol_1_';
 const SOURCE_MODES = [
   {code:'UTI', option:'Utility First (UTI)', description:'Сеть в приоритете'},
@@ -20,6 +20,7 @@ const SOURCE_MODES = [
 const escapeHtml = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ENTITIES = {
   grid_voltage: ROOT + 'grid_voltage', grid_current: 'sensor.energetika_grid_current_estimate',
+  grid_present: 'binary_sensor.energetika_grid_present', dtek_status: 'sensor.energetika_dtek_status',
   solar_voltage: ROOT + 'pv_voltage', solar_current: ROOT + 'pv_current',
   load_voltage: ROOT + 'output_voltage', load_current: ROOT + 'output_current',
   runtime: 'sensor.energetika_battery_runtime_to_reserve',
@@ -64,18 +65,18 @@ class EnergetikaCard extends HTMLElement {
   getCardSize() { return 12; }
   getGridOptions() { return {columns: 12, min_columns: 6}; }
   set hass(hass) { this._hass = hass; this._update(); }
-  connectedCallback() { if (!this.shadowRoot.firstChild) this._render(); }
-  disconnectedCallback() { clearTimeout(this._modeTimeout); }
+  connectedCallback() { if (!this.shadowRoot.firstChild) this._render(); clearInterval(this._gridClock); this._gridClock=setInterval(()=>this._updateGrid(),15000); }
+  disconnectedCallback() { clearTimeout(this._modeTimeout); clearInterval(this._gridClock); }
   _node(key, name, ic, x, y, w, color, unit = 'Вт') {
     return `<g class="node ${color}" data-key="${key}" role="button" tabindex="0" aria-label="${name}: открыть историю" transform="translate(${x} ${y})">
-      <rect class="node-bg" width="${w}" height="${key === 'battery' ? 132 : 112}" rx="16"/>
+      <rect class="node-bg" width="${w}" height="${['battery','grid'].includes(key) ? 132 : 112}" rx="16"/>
       <svg x="12" y="22" width="38" height="44" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">${ICONS[ic]}</svg>
       ${key==='grid'?'<g class="grid-cross" aria-hidden="true"><path d="M10 20 53 68M53 20 10 68"/></g>':''}
       <text class="node-name" x="60" y="29">${name}</text>
       <text class="node-value" x="60" y="59" data-value="${key}">—</text>
       <text class="node-unit" x="60" y="79">${unit}</text>
       <text class="node-metrics" x="12" y="100"><tspan data-key="${key==='battery'?'voltage':key+'_voltage'}" role="button" tabindex="0" aria-label="${name}: напряжение"><tspan data-value="${key==='battery'?'voltage':key+'_voltage'}">—</tspan> В</tspan><tspan dx="13" data-key="${key==='battery'?'current':key+'_current'}" role="button" tabindex="0" aria-label="${name}: ток">${key==='grid'?'≈ ':''}<tspan data-value="${key==='battery'?'current':key+'_current'}">—</tspan> А</tspan></text>
-      ${key==='battery'?'<text class="node-runtime" x="12" y="121" data-runtime>До 20% · —</text>':''}<path class="chev" d="m${w-18} 41 5 5-5 5"/>
+      ${key==='battery'?'<text class="node-runtime" x="12" y="121" data-runtime>До 20% · —</text>':''}${key==='grid'?'<g class="grid-timer" data-grid-timer role="button" tabindex="0" aria-label="График отключений ДТЭК"><title data-grid-timer-title>Открыть график ДТЭК</title><rect x="8" y="108" width="158" height="18" rx="5"/><text x="14" y="121" data-grid-countdown>Срок не указан</text></g>':''}<path class="chev" d="m${w-18} 41 5 5-5 5"/>
     </g>`;
   }
   _flow(key, d, x, y, color, label) {
@@ -106,6 +107,7 @@ class EnergetikaCard extends HTMLElement {
       .settings-gear{position:absolute;right:5px;top:8px;z-index:3;width:34px;height:34px;display:grid;place-items:center;padding:7px;border:1px solid #33546d;border-radius:10px;background:#102439dc;color:#92b4cc;box-shadow:0 3px 14px #0003}.settings-gear:hover{color:#90e7df;border-color:#41aaa6}.settings-gear svg{width:20px;height:20px}.source-row{display:flex;align-items:center;gap:5px}.source-row .source-option{flex:1;min-width:0}.source-info{width:25px;height:25px;flex-shrink:0;padding:0;border:1px solid #3a6177;border-radius:50%;background:#153144;color:#87cddd;font:bold 14px Georgia,serif}.mode-setting-link{display:block;margin-top:9px;width:100%;padding:6px;background:none;border:0;color:#7ba9c1;font-size:10px}@media(max-width:520px){.settings-gear{right:3px;top:5px;width:29px;height:29px;padding:5px;border-radius:8px}.settings-gear svg{width:18px;height:18px}}
       energetika-alerts-panel{position:absolute;left:28%;top:8px;z-index:3}@media(max-width:520px){energetika-alerts-panel{left:34%;top:5px}}
       .grid-cross{display:none;fill:none;stroke:#ff4263;stroke-width:6;stroke-linecap:round;filter:drop-shadow(0 0 4px #ff1744)}.grid-absent .grid-cross{display:block}.grid-absent .node-bg{fill:#2c101d;stroke:#ff526f;stroke-width:2.6}.grid-absent .node-unit{fill:#ff8ca1;font-weight:750}.grid-absent .node-name{fill:#ffb4c1}
+      .grid-timer rect{fill:#102432;stroke:#315367;stroke-width:.7}.grid-timer text{fill:#8ba7b9;font-size:10px;font-weight:600;font-variant-numeric:tabular-nums}.grid-timer.scheduled rect{fill:#302a16;stroke:#796232}.grid-timer.scheduled text{fill:#f0d58b}.grid-absent .grid-timer rect{fill:#401b2a;stroke:#8d4055}.grid-absent .grid-timer text{fill:#ffb5c3}.grid-timer:hover rect{stroke:#c5e3ef}
       .battery-layout{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)}.battery-summary [hidden],details [data-energy-only][hidden],details [data-voltage-only][hidden]{display:none!important}.battery-layout .mini{min-width:0}.battery-layout .mini>span{white-space:nowrap}.battery-main .plain-value strong,.battery-layout .mini strong{font-variant-numeric:tabular-nums}.battery-estimate{font-size:9px;color:#829eac}.bar.no-data{opacity:.35}
     </style>
     <ha-card class="shell"><header><div><div class="eyebrow">МОЙ ДОМ · ANENJI 4200</div><h1>Энергетика</h1><div class="sub">Солнце, сеть и энергия вашего дома</div></div><span class="live" data-live><span class="dot"></span><span data-live-text>Подключение</span></span></header>
@@ -117,8 +119,8 @@ class EnergetikaCard extends HTMLElement {
       <g class="scene"><path d="M170 237 348 132 552 237 518 255 348 170 205 256Z" fill="url(#roof)" stroke="#3a5871"/><path d="M207 255v118h308V254L348 170Z" fill="#102232" stroke="#2e4b61"/><path d="M210 373h315" stroke="#46616b"/><path d="m287 195 63-35 111 57-64 36Z" fill="#12314a" stroke="#487896"/><path d="m310 182 109 58m-84-72 109 59m-132-19 61-35m-33 50 62-35" stroke="#36637f" stroke-width="2"/><rect x="222" y="279" width="47" height="58" rx="2" fill="url(#window)"/><path d="M245 279v58m-23-27h47" stroke="#233e4b" stroke-width="4"/><rect x="451" y="279" width="43" height="58" rx="2" fill="url(#window)"/><path d="M472 279v58m-21-27h43" stroke="#233e4b" stroke-width="4"/><path d="M179 374h366" stroke="#2a4c50" stroke-width="3"/></g>
       ${this._flow('pv_battery','M428 146V198H357V274',357,230,'solar','Солнце → АКБ')}
       ${this._flow('pv_load','M540 146V218H625V274',625,238,'solar','Солнце → нагрузка')}
-      ${this._flow('grid_battery','M104 242V330H278',193,330,'grid','Сеть → АКБ')}
-      ${this._flow('grid_load','M104 242V454H616V386',357,454,'grid','Сеть → нагрузка, байпас')}
+      ${this._flow('grid_battery','M104 262V330H278',193,330,'grid','Сеть → АКБ')}
+      ${this._flow('grid_load','M104 262V454H616V386',357,454,'grid','Сеть → нагрузка, байпас')}
       ${this._flow('battery_load','M450 330H531',491,330,'battery','АКБ → нагрузка')}
       <text x="357" y="489" class="route-caption">СЕТЬ → ДОМ · БАЙПАС</text>
       ${this._node('grid','Сеть','grid',18,130,174,'grid')}
@@ -158,6 +160,10 @@ class EnergetikaCard extends HTMLElement {
       try { localStorage.setItem('energetika.battery-mode',this._batteryMode); } catch {}
       this._update();
     }));
+    const gridTimer=root.querySelector('[data-grid-timer]');
+    const openDtek=event=>{event.stopPropagation();const panel=root.querySelector('energetika-automation-panel');panel.hass=this._hass;panel.open('dtek');};
+    gridTimer.addEventListener('click',openDtek);
+    gridTimer.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openDtek(event);}});
     root.querySelector('energetika-alerts-panel').configure({entity:this.config?.alerts_entity,script:this.config?.alerts_script});
     const settings=root.querySelector('energetika-settings-panel');
     settings.configure({prefix:this.config?.settings_prefix||this._entities.mode_select.split('.')[1].replace(/output_source_priority$/,''),control:this._entities.control_mode});
@@ -186,8 +192,7 @@ class EnergetikaCard extends HTMLElement {
     r.querySelector('energetika-settings-panel').hass=this._hass;
     r.querySelector('energetika-automation-panel').hass=this._hass;
     this._updateSourceMode();
-    const gridNode=r.querySelector('.node[data-key="grid"]'),gridAbsent=this._hass.connected!==false&&states['binary_sensor.energetika_grid_present']?.state==='off'&&this._number('grid_voltage')!==null;
-    gridNode.classList.toggle('grid-absent',gridAbsent);gridNode.querySelector('.node-unit').textContent=gridAbsent?'СЕТИ НЕТ':'Вт';gridNode.setAttribute('aria-label',gridAbsent?'Сеть отсутствует: открыть историю':'Сеть: открыть историю');
+    this._updateGrid();
     r.querySelectorAll('[data-value]').forEach(el=>{
       const key=el.dataset.value,n=this._number(key);
       const digits=/voltage|current|percent/.test(key)?1:0;
@@ -252,6 +257,30 @@ class EnergetikaCard extends HTMLElement {
     r.querySelector('[data-last-full]').textContent=last?`Последний полный заряд: ${new Date(last).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}`:'Полный заряд ещё не подтверждён';
     const updated=states[this._entities.load]?.last_updated;
     r.querySelector('[data-updated]').textContent=updated?`Данные · ${new Date(updated).toLocaleTimeString('ru-RU')}`:'Ожидание данных';
+  }
+  _updateGrid() {
+    if(!this._hass||!this.shadowRoot.firstChild)return;
+    const r=this.shadowRoot,states=this._hass.states,grid=r.querySelector('.node[data-key="grid"]');
+    const connected=this._hass.connected!==false,gridState=states[this._entities.grid_present]?.state;
+    const gridKnown=connected&&this._number('grid_voltage')!==null&&['on','off'].includes(gridState),absent=gridKnown&&gridState==='off';
+    grid.classList.toggle('grid-absent',absent);grid.querySelector('.node-unit').textContent=absent?'СЕТИ НЕТ':'Вт';
+    grid.setAttribute('aria-label',absent?'Сеть отсутствует: открыть историю':'Сеть: открыть историю');
+    const dtek=states[this._entities.dtek_status],a=dtek?.attributes||{},now=Date.now()/1000;
+    const age=now-Number(a.last_success),fresh=connected&&a.fresh===true&&!a.error&&Number.isFinite(age)&&age>=0&&age<900&&!['unknown','unavailable','stale','not_configured'].includes(dtek?.state);
+    const rawDeadline=Number(a[absent?'restoration_at':'next_outage_at']);
+    const eligible=absent?dtek?.state==='outage':!a.emergency&&!a.multi_group;
+    const deadline=fresh&&eligible&&Number.isFinite(rawDeadline)&&rawDeadline>0?rawDeadline:null;
+    let label='Срок не указан',title='ДТЭК не указал срок. Открыть график отключений.';
+    if(!gridKnown){label=connected?'Нет данных сети':'Нет соединения';title='Для таймера нужны свежие показания сети. Открыть ДТЭК.';}
+    else if(a.configured&&!fresh){label='ДТЭК: данные устарели';title='Нет свежего ответа ДТЭК. Предыдущий срок не используется. Открыть ДТЭК.';}
+    else if(deadline!==null){
+      const at=new Date(deadline*1000).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+      if(deadline>now){const minutes=Math.ceil((deadline-now)/60);label=`До ${absent?'включения':'отключения'} ≈ ${Math.floor(minutes/60)}:${String(minutes%60).padStart(2,'0')}`;}
+      else label=absent?'Срок прошёл · ждём':'Отключение ожидается';
+      title=`${absent?'Возвращение света по ориентиру ДТЭК':'Отключение по графику ДТЭК'}: ${at}. Время может измениться. Открыть график.`;
+    }
+    const timer=r.querySelector('[data-grid-timer]');timer.classList.toggle('scheduled',gridKnown&&deadline!==null);
+    timer.setAttribute('aria-label',`${label}. Открыть график ДТЭК`);r.querySelector('[data-grid-countdown]').textContent=label;r.querySelector('[data-grid-timer-title]').textContent=title;
   }
   _sourceContext() {
     const states=this._hass?.states||{},entity=this._entities.mode_select,native=states[entity];

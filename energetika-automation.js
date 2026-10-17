@@ -35,6 +35,7 @@ class EnergetikaAutomationPanel extends HTMLElement {
   connectedCallback(){if(!this.shadowRoot.firstChild)this._render();}
   disconnectedCallback(){clearInterval(this._timer);}
   set hass(value){this._hass=value;if(!this.shadowRoot.firstChild)this._render();this._sync();}
+  open(tab=this._tab||'control'){if(!this.shadowRoot.firstChild)this._render();this._selectTab(tab);const dialog=this.shadowRoot.querySelector('dialog');if(!dialog.open)dialog.showModal();this._sync();clearInterval(this._timer);this._timer=setInterval(()=>this._sync(),30000);}
   _state(id){return this._hass?.states[id]?.state;}
   _attrs(id){return this._hass?.states[id]?.attributes||{};}
   _render(){
@@ -62,7 +63,7 @@ class EnergetikaAutomationPanel extends HTMLElement {
     <section id="auto-dtek" role="tabpanel" aria-labelledby="tab-dtek" data-section="dtek" hidden><energetika-dtek-panel></energetika-dtek-panel></section>
     </div></dialog>`;
     const r=this.shadowRoot,dialog=r.querySelector('dialog');
-    r.querySelector('[data-open]').onclick=()=>{dialog.showModal();this._sync();this._timer=setInterval(()=>this._sync(),30000);};
+    r.querySelector('[data-open]').onclick=()=>this.open();
     r.querySelector('.close').onclick=()=>dialog.close();
     dialog.addEventListener('close',()=>{r.querySelector('energetika-hourly-charts').active=false;r.querySelector('energetika-dtek-panel').active=false;clearInterval(this._timer);r.querySelector('[data-open]').focus();});
     dialog.addEventListener('click',e=>{if(e.target===dialog){const b=dialog.getBoundingClientRect();if(e.clientX<b.left||e.clientX>b.right||e.clientY<b.top||e.clientY>b.bottom)dialog.close();}});
