@@ -8,6 +8,8 @@
 
 [Лінія мережі через центр схеми](docs/screenshots/energy-central-flows.jpg) · [Графік заряду й розряду АКБ з плитки](docs/screenshots/battery-flow-dialog.jpg) · [Окремі дані та прогнози](docs/screenshots/data-forecast-panel.jpg)
 
+Два види з перемикачем угорі: [**«Минимализм»**](docs/screenshots/mobile-minimal-view.jpg) — великі плитки й проста схема; [**«Дом»**](docs/screenshots/mobile-home-view.jpg) — будинок із панелями на фоні та анімовані потоки. [Горизонтальний вид із будинком](docs/screenshots/landscape-home-view.jpg) · [Вид на комп’ютері](docs/screenshots/desktop-home-view.jpg). Вибір запам’ятовується окремо на кожному пристрої.
+
 ![Збільшений графік з легендою в один рядок](docs/screenshots/mobile-history.jpg)
 
 [Меню режимів UTI / SOL / SBU / SUB / SUF](docs/screenshots/mode-menu.jpg)
@@ -91,9 +93,11 @@ Home Assistant 2026.10, EyeBond Local **0.1.53**, драйвер `modbus_smg`, �
 
 ## Ручне встановлення
 
+Для версії 2.12.1 після копіювання JS створіть у `www` також копію `energetika-card.js` з назвою **`energetika-card-2.12.1.js`**. Саме цю копію підключіть як ресурс. Офлайн-встановлювач створює її автоматично. Ім’я з версією допомагає уникнути старої копії картки у кеші під час оновлення.
+
 Повні кроки, відповідність сутностей, оновлення і відкат — у **[docs/INSTALL.uk.md](docs/INSTALL.uk.md)**.
 
-Скопіюйте `custom_components/energetika_dtek` до `custom_components` HA, `energetika.yaml` до каталогу конфігурації HA, вісім JS-файлів (`energetika-card.js`, `energetika-history.js`, `energetika-settings.js`, `energetika-automation.js`, `energetika-data.js`, `energetika-alerts.js`, `energetika-hourly.js`, `energetika-dtek.js`) — до `www`. Додайте пакет у `homeassistant.packages`, перевірте конфігурацію та перезапустіть HA. Додайте ресурс `/local/energetika-card.js?v=2.11.0` типу JavaScript module і вставте `dashboard-energetika.yaml` у текстовий редактор окремої панелі. Не замінюйте власний `configuration.yaml` цілком.
+Скопіюйте `custom_components/energetika_dtek` до `custom_components` HA, `energetika.yaml` до каталогу конфігурації HA, вісім JS-файлів (`energetika-card.js`, `energetika-history.js`, `energetika-settings.js`, `energetika-automation.js`, `energetika-data.js`, `energetika-alerts.js`, `energetika-hourly.js`, `energetika-dtek.js`) — до `www`. Додайте пакет у `homeassistant.packages`, перевірте конфігурацію та перезапустіть HA. Додайте ресурс `/local/energetika-card-2.12.1.js` типу JavaScript module і вставте `dashboard-energetika.yaml` у текстовий редактор окремої панелі. Не замінюйте власний `configuration.yaml` цілком.
 
 Для сумісного драйвера використайте `patches/install_guard.py`. Самостійний офлайн-інсталятор цієї конкретної конфігурації збирається командою `python build_deploy.py` у `.deploy/install_energetika_v2.py`. Перед застосуванням на іншому обладнанні адаптуйте всі сутності, ємність і межі.
 

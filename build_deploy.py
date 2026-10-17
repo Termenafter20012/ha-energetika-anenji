@@ -39,7 +39,7 @@ def main():
     control_module.install(root)
     backup=root/('energetika-ui-backup-'+datetime.now(timezone.utc).strftime('%%Y%%m%%dT%%H%%M%%SZ'))
     backup.mkdir()
-    for name,destination in [('energetika.yaml','energetika.yaml'),('energetika-card.js','www/energetika-card.js'),('energetika-history.js','www/energetika-history.js'),('energetika-settings.js','www/energetika-settings.js'),('energetika-automation.js','www/energetika-automation.js'),('energetika-data.js','www/energetika-data.js'),('energetika-alerts.js','www/energetika-alerts.js'),('energetika-hourly.js','www/energetika-hourly.js'),('energetika-dtek.js','www/energetika-dtek.js')]+[(name,name) for name in files if name.startswith('custom_components/energetika_dtek/')]:
+    for name,destination in [('energetika.yaml','energetika.yaml'),('energetika-card.js','www/energetika-card.js'),('energetika-card.js','www/energetika-card-2.12.1.js'),('energetika-history.js','www/energetika-history.js'),('energetika-settings.js','www/energetika-settings.js'),('energetika-automation.js','www/energetika-automation.js'),('energetika-data.js','www/energetika-data.js'),('energetika-alerts.js','www/energetika-alerts.js'),('energetika-hourly.js','www/energetika-hourly.js'),('energetika-dtek.js','www/energetika-dtek.js')]+[(name,name) for name in files if name.startswith('custom_components/energetika_dtek/')]:
         path=root/destination
         if path.is_symlink():raise SystemExit('Refusing symlink: '+str(path))
         path.parent.mkdir(parents=True,exist_ok=True)
@@ -51,7 +51,7 @@ def main():
         temporary.write_text(files[name],encoding='utf-8')
         temporary.replace(path)
     print('UI and YAML installed; backup:',backup)
-    print('Restart Home Assistant; update resource URL to /local/energetika-card.js?v=2.11.0')
+    print('Restart Home Assistant; update resource URL to /local/energetika-card-2.12.1.js')
 if __name__=='__main__': main()
 ''' % payload
 Path('.deploy').mkdir(exist_ok=True)
