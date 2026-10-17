@@ -1,5 +1,5 @@
-import './energetika-dtek.js?v=2.8.0';
-import './energetika-hourly.js?v=2.8.0';
+import './energetika-dtek.js?v=2.13.0.1';
+import './energetika-hourly.js?v=2.13.0';
 /* Data views read HA sensors; they do not switch inverter modes. */
 const P='sensor.anenji_4200_protocol_1_';
 const WEATHER='sensor.energetika_solar_weather';

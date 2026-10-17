@@ -15,6 +15,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.storage import Store
 
 from .client import DtekClient, DtekError
+from .archive import Archive, key_at
 
 DOMAIN = "energetika_dtek"
 CONFIG_SCHEMA = vol.Schema({vol.Optional(DOMAIN): {}}, extra=vol.ALLOW_EXTRA)
@@ -31,6 +32,7 @@ class Manager:
         self.last_attempt = 0
         self.error = None
         self.listeners = set()
+        self.archive = Archive(hass, self)
 
     @property
     def fresh(self):
@@ -60,6 +62,7 @@ class Manager:
                 result = await self.client.status(selected)
                 self.address, self.data = dict(selected), result
                 self.last_success, self.error = time.time(), None
+                self.archive.capture_schedule(self.address, result.get("schedule", []), self.last_success)
                 await self.save()
             except DtekError as exc:
                 if address is not None:
@@ -70,6 +73,8 @@ class Manager:
         return self.snapshot()
 
     async def tick(self, _now):
+        self.archive.observe()
+        self.archive.persist()
         if self.address and time.time() - self.last_attempt >= (60 if self.error else 300):
             await self.refresh()
         else:
@@ -77,6 +82,7 @@ class Manager:
 
     async def stop(self, _event):
         self.cancel_timer()
+        await self.archive.stop()
         await self.client.session.close()
 
 
@@ -87,11 +93,13 @@ async def async_setup(hass, config):
     manager.data = saved.get("data", {})
     manager.last_success = saved.get("last_success", 0)
     hass.data[DOMAIN] = manager
-    for command in (ws_catalog, ws_houses, ws_address, ws_status, ws_refresh):
+    for command in (ws_catalog, ws_houses, ws_address, ws_status, ws_refresh, ws_history):
         websocket_api.async_register_command(hass, command)
     manager.cancel_timer = async_track_time_interval(hass, manager.tick, timedelta(minutes=1))
     hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, manager.stop)
     await discovery.async_load_platform(hass, Platform.SENSOR, DOMAIN, {}, config)
+    await manager.archive.start()
+    hass.async_create_task(manager.archive.recent_weather())
     if manager.address:
         hass.async_create_task(manager.refresh())
     return True
@@ -159,3 +167,18 @@ async def ws_status(hass, connection, msg):
 @websocket_api.async_response
 async def ws_refresh(hass, connection, msg):
     connection.send_result(msg["id"], await hass.data[DOMAIN].refresh())
+
+
+@websocket_api.websocket_command({vol.Required("type"): DOMAIN + "/history", vol.Required("date"): vol.Match(r"^\d{4}-\d{2}-\d{2}$")})
+@websocket_api.async_response
+async def ws_history(hass, connection, msg):
+    manager = hass.data[DOMAIN]
+    try:
+        result = manager.archive.snapshot(msg["date"])
+    except ValueError:
+        connection.send_error(msg["id"], "invalid_date", "Укажите существующий день календаря.")
+        return
+    if not result["weather"] and msg["date"] < key_at(time.time()):
+        await manager.archive.recent_weather()
+        result = manager.archive.snapshot(msg["date"])
+    connection.send_result(msg["id"], result)

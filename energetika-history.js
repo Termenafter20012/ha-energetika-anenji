@@ -1,7 +1,8 @@
-/* Energetika history 2.2 — local HA recorder, touch zoom and pan. */
+import {dayKey,dayStart,dateLabel} from './energetika-date.js?v=2.13.0';
+/* Energetika history 2.13 — recorder, calendar, fixed-hour navigation and touch zoom. */
 const escapeHtml = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt = (n,d=0)=>Number(n).toLocaleString('ru-RU',{maximumFractionDigits:d});
-const clock = time=>new Date(time).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+const clock = time=>new Date(time).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'});
 
 export function cleanHistory(rows,minimum,maximum,start,end) {
   let rejected=0;
@@ -60,7 +61,7 @@ class EnergetikaHistoryCard extends HTMLElement {
   setConfig(config){
     if(!Array.isArray(config.entities)||!config.entities.length)throw new Error('energetika-history-card: entities required');
     this.config=config;
-    this._date=config.date_selector?this._localDate(new Date()):'';
+    this._anchor=config.date_selector?dayStart(dayKey(Date.now())):null;
     this._entities=config.entities.map(item=>typeof item==='string'?{entity:item,name:item}:item);
     this._render();
   }
@@ -75,22 +76,32 @@ class EnergetikaHistoryCard extends HTMLElement {
   disconnectedCallback(){clearInterval(this._timer);this._resize?.disconnect();this._pointers.clear();this._request++;}
   _localDate(date){return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;}
   _window(){
-    let end=new Date(),start;
-    if(this._date){start=new Date(this._date+'T00:00:00');end=new Date(start);end.setDate(end.getDate()+1);if(end>new Date())end=new Date();}
-    else start=new Date(end.getTime()-Number(this._range)*3600000);
-    return {start:+start,end:Math.max(+start+1000,+end)};
+    const now=Date.now(),span=Number(this._range)*3600000,start=this._anchor??now-span;
+    return {start,end:Math.max(start+1000,Math.min(now,start+span))};
+  }
+  _navigate(direction){if(direction>0&&this._anchor===null)return;const span=Number(this._range)*3600000,start=this._window().start+direction*span;if(start>=Date.now())return;this._anchor=start;this._view=null;this._request++;this._load();}
+  _syncControls(){
+    const r=this.shadowRoot,{start,end}=this._window(),picker=r.querySelector('energetika-date-picker');picker.value=dayKey(this._anchor??Date.now());picker.limits={max:dayKey(Date.now())};
+    r.querySelector('[data-step="1"]').disabled=this._anchor===null||start+Number(this._range)*3600000>=Date.now();r.querySelector('[data-now]').hidden=this._anchor===null;
+    r.querySelectorAll('[data-range]').forEach(b=>b.classList.toggle('selected',b.dataset.range===this._range));
+    const base=(this.config.title||'История энергии').replace(/ · 24 часа$/,'');
+    r.querySelector('h2').textContent=base+' · '+this._range+' ч';
+    r.querySelector('[data-period]').textContent=`${dateLabel(dayKey(start))}, ${clock(start)} — ${dayKey(end)===dayKey(start)?'':dateLabel(dayKey(end))+', '}${clock(end)}`;
   }
   _render(){
     this.shadowRoot.innerHTML=`<style>
       :host{display:block;color:#edf5ff;font-family:Inter,system-ui,sans-serif}*{box-sizing:border-box}button,input{font:inherit;color:inherit}button{cursor:pointer;touch-action:manipulation}button:focus-visible,input:focus-visible,svg:focus-visible{outline:2px solid #38bfff;outline-offset:2px}
       ha-card{display:block;max-width:1100px;margin:8px auto 16px;padding:21px 23px;border:1px solid #223449;border-radius:25px;background:radial-gradient(ellipse at 90% 0,#14253a 0,transparent 65%),linear-gradient(145deg,#0a1524,#060e18);box-shadow:0 10px 30px #0002}
-      header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.eyebrow{color:#65879f;font-size:9px;font-weight:700;letter-spacing:1.8px;margin-bottom:7px}h2{margin:0;font-size:18px;font-weight:650;letter-spacing:-.3px}.controls{display:flex;gap:5px;align-items:center}.controls button,input,.zoom button{border:1px solid #284156;background:#0b1a2a;border-radius:9px;padding:7px 10px;font-size:11px}.controls button.selected{color:#4acaff;border-color:#2a829f;background:#103348}.controls input{color-scheme:dark;max-width:132px;min-width:0}.status{display:none;font-size:11px;color:#e6b18a;margin:9px 0 0}.status.visible{display:block}.chart{position:relative;margin-top:6px}.chart svg{width:100%;height:310px;display:block;touch-action:none;user-select:none;-webkit-user-select:none;cursor:crosshair}.chart svg.zoomed{cursor:grab}.chart svg.dragging{cursor:grabbing}.gridline{stroke:#234055;stroke-dasharray:3 5;stroke-opacity:.65}.axis{fill:#8ba6ba;font-size:11px;font-variant-numeric:tabular-nums}.series-line{fill:none;stroke-width:1.8;stroke-linejoin:round;vector-effect:non-scaling-stroke}.cross{stroke:#a4beca;stroke-dasharray:3 4;stroke-opacity:.65}
+      header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.eyebrow{color:#65879f;font-size:9px;font-weight:700;letter-spacing:1.8px;margin-bottom:7px}h2{margin:0;font-size:18px;font-weight:650;letter-spacing:-.3px}.controls{display:flex;gap:5px;align-items:center;flex-wrap:wrap}.controls button:disabled{opacity:.3;cursor:default}.period{color:#86aabe;font-size:11px;margin:10px 0 0;font-variant-numeric:tabular-nums}.controls [hidden]{display:none}.controls [data-step]{font-size:20px;padding:3px 10px;min-height:34px}.controls energetika-date-picker{font:inherit}.controls button,input,.zoom button{border:1px solid #284156;background:#0b1a2a;border-radius:9px;padding:7px 10px;font-size:11px}.controls button.selected{color:#4acaff;border-color:#2a829f;background:#103348}.controls input{color-scheme:dark;max-width:132px;min-width:0}.status{display:none;font-size:11px;color:#e6b18a;margin:9px 0 0}.status.visible{display:block}.chart{position:relative;margin-top:6px}.chart svg{width:100%;height:310px;display:block;touch-action:none;user-select:none;-webkit-user-select:none;cursor:crosshair}.chart svg.zoomed{cursor:grab}.chart svg.dragging{cursor:grabbing}.gridline{stroke:#234055;stroke-dasharray:3 5;stroke-opacity:.65}.axis{fill:#8ba6ba;font-size:11px;font-variant-numeric:tabular-nums}.series-line{fill:none;stroke-width:1.8;stroke-linejoin:round;vector-effect:non-scaling-stroke}.cross{stroke:#a4beca;stroke-dasharray:3 4;stroke-opacity:.65}
       .legend{display:grid;grid-template-columns:repeat(var(--series-count),minmax(0,1fr));gap:7px;margin-top:8px}.legend button{display:grid;grid-template-columns:7px 1fr;align-items:center;gap:4px 6px;text-align:left;background:#10213277;border:1px solid #20394b;border-radius:10px;padding:8px;min-width:0}.swatch{width:6px;height:6px;border-radius:50%;background:var(--tone);box-shadow:0 0 8px color-mix(in srgb,var(--tone) 40%,transparent)}.legend .name{color:#a6bed0;font-size:10px;white-space:nowrap}.legend strong{grid-column:2;font-size:14px;font-weight:650;white-space:nowrap;font-variant-numeric:tabular-nums}.legend button.off{opacity:.35}.unit{font-size:9px;font-weight:400;color:#8ca4b8;margin-left:2px}.footer{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;font-size:10px;color:#6b8a9f}.zoom{display:flex;align-items:center;gap:4px}.zoom button{padding:3px 9px;font-size:15px;min-height:28px}.zoom .fit{font-size:10px}.zoom button:disabled{opacity:.35;cursor:default}.zoom-label{font-variant-numeric:tabular-nums;color:#7dc7e0;font-size:10px;margin-left:3px}.tooltip{display:none;position:absolute;pointer-events:none;z-index:2;top:25px;max-width:230px;background:#07111df2;border:1px solid #325169;border-radius:12px;padding:11px;box-shadow:0 5px 24px #0005;font-size:11px;color:#bdd0de}.tooltip strong{color:#f1f8ff}.tooltip .row{display:flex;justify-content:space-between;gap:15px;margin-top:6px}.tip-time{color:#87a4bb;font-size:10px;margin-bottom:9px}.empty{fill:#7897ad;font-size:12px;text-anchor:middle}
       @media(max-width:600px){ha-card{padding:14px 10px;border-radius:20px}h2{font-size:15px}.eyebrow{font-size:8px;margin-bottom:5px}.controls{gap:4px}.controls button,input{font-size:10px;padding:6px 8px}.chart svg{height:280px}.legend{gap:4px;margin-top:3px}.legend button{padding:7px 3px;gap:4px 3px;grid-template-columns:5px 1fr;border-radius:8px}.swatch{width:5px;height:5px}.legend .name{font-size:9px}.legend strong{font-size:12px;grid-column:1/-1;text-align:center}.unit{font-size:8px}.footer{font-size:9px;flex-wrap:wrap}.zoom-label{font-size:9px}.gesture-hint{flex:1;white-space:nowrap}}
       @media(max-width:360px){.legend .name{font-size:8px}.legend strong{font-size:11px}.legend button{gap:3px 2px}.chart svg{height:265px}}
-    </style><ha-card><header><div><div class="eyebrow">ЭНЕРГЕТИКА / ИСТОРИЯ</div><h2>${escapeHtml(this.config.title||'История энергии')}</h2></div><div class="controls"><button data-range="6">6 ч</button><button data-range="12">12 ч</button><button data-range="24" class="selected">24 ч</button><input type="date" aria-label="День графика" value="${this._date}" max="${this._localDate(new Date())}"><button data-refresh title="Обновить историю">↻</button></div></header><div class="status" role="status"></div><div class="chart"><svg role="img" tabindex="0" aria-label="${escapeHtml(this.config.title||'График')}. Два пальца — масштаб, один — сдвиг. Клавиши плюс, минус, стрелки, Home."></svg><div class="tooltip"></div></div><div class="legend" style="--series-count:${this._entities.length}"></div><div class="footer"><span class="gesture-hint">Два пальца — масштаб · один — сдвиг</span><div class="zoom"><button data-zoom="in" aria-label="Увеличить график">+</button><button data-zoom="out" aria-label="Уменьшить график">−</button><button class="fit" data-fit title="Показать весь выбранный период">Весь период</button><span class="zoom-label"></span></div></div></ha-card>`;
-    this.shadowRoot.querySelectorAll('[data-range]').forEach(button=>button.addEventListener('click',()=>{this._range=button.dataset.range;this._date='';this._view=null;this.shadowRoot.querySelector('input').value='';this._load();}));
-    this.shadowRoot.querySelector('input').addEventListener('change',event=>{this._date=event.target.value;this._view=null;this._load();});
+    </style><ha-card><header><div><div class="eyebrow">ЭНЕРГЕТИКА / ИСТОРИЯ</div><h2>${escapeHtml(this.config.title||'История энергии')}</h2></div><div class="controls"><button data-range="6">6 ч</button><button data-range="12">12 ч</button><button data-range="24" class="selected">24 ч</button><button data-step="-1" aria-label="Предыдущий период">‹</button><energetika-date-picker></energetika-date-picker><button data-step="1" aria-label="Следующий период">›</button><button data-now hidden title="К текущему времени">Сейчас</button><button data-refresh title="Обновить историю">↻</button></div></header><p class="period" data-period></p><div class="status" role="status"></div><div class="chart"><svg role="img" tabindex="0" aria-label="${escapeHtml(this.config.title||'График')}. Два пальца — масштаб, один — сдвиг. Клавиши плюс, минус, стрелки, Home."></svg><div class="tooltip"></div></div><div class="legend" style="--series-count:${this._entities.length}"></div><div class="footer"><span class="gesture-hint">Два пальца — масштаб · один — сдвиг</span><div class="zoom"><button data-zoom="in" aria-label="Увеличить график">+</button><button data-zoom="out" aria-label="Уменьшить график">−</button><button class="fit" data-fit title="Показать весь выбранный период">Весь период</button><span class="zoom-label"></span></div></div></ha-card>`;
+    this.shadowRoot.querySelectorAll('[data-range]').forEach(button=>button.addEventListener('click',()=>{this._range=button.dataset.range;this._view=null;this._request++;this._load();}));
+    this.shadowRoot.querySelectorAll('[data-step]').forEach(button=>button.onclick=()=>this._navigate(Number(button.dataset.step)));
+    this.shadowRoot.querySelector('energetika-date-picker').addEventListener('change',event=>{this._anchor=dayStart(event.detail.value);this._view=null;this._request++;this._load();});
+    this.shadowRoot.querySelector('[data-now]').onclick=()=>{this._anchor=null;this._view=null;this._request++;this._load();};
+    this._syncControls();
     this.shadowRoot.querySelector('[data-refresh]').addEventListener('click',()=>this._load());
     this.shadowRoot.querySelector('[data-fit]').addEventListener('click',()=>{this._view=null;this._draw(false);});
     this.shadowRoot.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>this._zoom(button.dataset.zoom==='in'?0.5:2)));
@@ -114,9 +125,7 @@ class EnergetikaHistoryCard extends HTMLElement {
     if(this._loading){this._pending=true;return;}
     const request=++this._request,{start,end}=this._window();this._lastFetch=Date.now();this._loading=true;
     const status=this.shadowRoot.querySelector('.status');status.classList.remove('visible');
-    const baseTitle=(this.config.title||'История энергии').replace(/ · 24 часа$/,'');
-    this.shadowRoot.querySelector('h2').textContent=baseTitle+(this._date?' · '+new Date(this._date+'T12:00:00').toLocaleDateString('ru-RU'):' · '+this._range+' ч');
-    this.shadowRoot.querySelectorAll('[data-range]').forEach(button=>button.classList.toggle('selected',!this._date&&button.dataset.range===this._range));
+    this._syncControls();
     try{
       const ids=this._entities.map(s=>s.entity).join(',');
       const response=await this._hass.callApi('GET',`history/period/${new Date(start).toISOString()}?filter_entity_id=${encodeURIComponent(ids)}&end_time=${encodeURIComponent(new Date(end).toISOString())}&minimal_response&no_attributes`);
