@@ -1,6 +1,7 @@
-import './energetika-history.js?v=2.8.0';
+import './energetika-history.js?v=2.11.0';
 import './energetika-settings.js?v=2.8.0';
-import './energetika-automation.js?v=2.8.2';
+import './energetika-automation.js?v=2.11.0';
+import './energetika-data.js?v=2.11.0';
 import './energetika-alerts.js?v=2.8.0';
 
 export function formatRuntime(minutes) {
@@ -8,7 +9,7 @@ export function formatRuntime(minutes) {
   const total=Math.floor(minutes);
   return total===0?'0 мин':`${Math.floor(total/60)} ч ${String(total%60).padStart(2,'0')} мин`;
 }
-/* Energetika 2.10.2 — local Home Assistant card, no external dependencies. */
+/* Energetika 2.11.0 — local Home Assistant card, no external dependencies. */
 const ROOT = 'sensor.anenji_4200_protocol_1_';
 const SOURCE_MODES = [
   {code:'UTI', option:'Utility First (UTI)', description:'Сеть в приоритете'},
@@ -27,7 +28,7 @@ const ENTITIES = {
   mode_select: 'select.anenji_4200_protocol_1_output_source_priority',
   output_priority: ROOT + 'output_source_priority', control_mode: ROOT + 'control_mode',
   grid: ROOT + 'grid_power', solar: ROOT + 'pv_power', load: ROOT + 'load_power',
-  battery: 'sensor.energetika_battery_remaining', percent: 'sensor.energetika_battery_percent_energy',
+  battery: 'sensor.energetika_battery_remaining', battery_energy: 'sensor.energetika_battery_remaining', percent: 'sensor.energetika_battery_percent_energy',
   voltage: ROOT + 'battery_voltage', voltage_min: ROOT + 'battery_under_voltage_off_grid',
   percent_voltage: 'sensor.energetika_battery_percent_voltage', inverter_percent: ROOT + 'battery_percent',
   inverter_energy: 'sensor.energetika_battery_remaining_inverter',
@@ -60,6 +61,7 @@ class EnergetikaCard extends HTMLElement {
   setConfig(config) {
     this.config = {...config};
     this._entities = {...ENTITIES, ...(config.entities || {})};
+    if(!config.entities?.battery_energy)this._entities.battery_energy=this._entities.battery;
     this._render();
   }
   getCardSize() { return 12; }
@@ -77,7 +79,7 @@ class EnergetikaCard extends HTMLElement {
     </div>`;
   }
   _flow(key, d, color) {
-    return `<g class="flow ${color}" data-flow="${key}"><path class="track" d="${d}"/><path class="wire" d="${d}"/><path class="moving" d="${d}" marker-end="url(#arrow-${color})"/></g>`;
+    return `<g class="flow ${color}" data-flow="${key}">${key==='grid_load'?'<path class="crossing-gap" d="M194 125C182 125 182 145 194 145"/>':''}<path class="track" d="${d}"/><path class="wire" d="${d}"/><path class="moving" d="${d}" marker-end="url(#arrow-${color})"/></g>`;
   }
   _flowLabel(key, x, y, color, label) {
     return `<button class="flow-label ${color}" data-flow="${key}" data-key="${key}" title="${label} · открыть историю" aria-label="${label}: открыть историю" style="left:${x/440*100}%;top:${y/300*100}%"><span data-value="${key}">—</span><span class="flow-unit"> Вт</span></button>`;
@@ -92,7 +94,7 @@ class EnergetikaCard extends HTMLElement {
       *{box-sizing:border-box}button{font:inherit}button,[role=button]{-webkit-tap-highlight-color:transparent;cursor:pointer}button:focus-visible,[role=button]:focus-visible{outline:3px solid #fff;outline-offset:3px}button{color:inherit} .solar{--tone:var(--solar);color:var(--solar)}.grid{--tone:var(--grid);color:var(--grid)}.battery{--tone:var(--battery);color:var(--battery)}.home{--tone:var(--home);color:var(--home)}
       .shell{max-width:1100px;margin:8px auto 18px;border-radius:28px;padding:26px;background:radial-gradient(ellipse at 75% 8%,#15233e 0,transparent 55%),linear-gradient(145deg,#0a1524,#060e18 70%);border:1px solid #223449;box-shadow:0 12px 40px #0003;overflow:hidden}
       header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 4px 8px}h1{font-size:27px;letter-spacing:-.7px;margin:0 0 5px;font-weight:700}.eyebrow{font-size:10px;font-weight:700;color:#6989a5;letter-spacing:2px;margin-bottom:7px}.sub{color:#91a6bb;font-size:12px}.live{display:flex;align-items:center;gap:7px;border:1px solid #1e514d;background:#10312f88;border-radius:30px;padding:7px 11px;color:#64ecc9;font-size:11px;white-space:nowrap}.dot{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 10px currentColor}.live.offline{color:#f6c66a;border-color:#67542d;background:#3c301c88}
-      .diagram{width:100%;max-width:900px;display:block;margin:auto;overflow:visible}.scene{opacity:.36}.node-bg{fill:#081522;stroke:currentColor;stroke-width:1.6}.node{filter:drop-shadow(0 0 8px color-mix(in srgb,currentColor 15%,transparent));transition:filter .2s}.node:hover{filter:drop-shadow(0 0 10px currentColor)}.node-name{font-size:17px;fill:#c2cfde;font-weight:500}.node-value{font-size:26px;fill:#f6faff;font-weight:750;font-variant-numeric:tabular-nums;letter-spacing:-.5px}.node-unit{font-size:13px;fill:#7f99ad}.chev{fill:none;stroke:currentColor;stroke-width:2;opacity:.75}.track{fill:none;stroke:currentColor;stroke-width:3;opacity:.1;stroke-linejoin:round}.wire{fill:none;stroke:currentColor;stroke-width:2;opacity:.22;stroke-linejoin:round}.moving{fill:none;stroke:currentColor;stroke-width:3;stroke-dasharray:5 16;stroke-linecap:round;stroke-linejoin:round;opacity:0}.flow.active .wire{opacity:.7;filter:drop-shadow(0 0 5px currentColor)}.flow.active .moving{opacity:1;animation:current 1.6s linear infinite}.flow-label rect{fill:#0b1725;stroke:currentColor;stroke-opacity:.4;stroke-width:1.2}.flow-label text{fill:#c8d5e4;font-size:19px;font-weight:650;font-variant-numeric:tabular-nums}.flow.active .flow-label rect{stroke-opacity:.8}.flow.active .flow-label text{fill:#f6faff}.flow-unit{font-size:13px}.flow-label:hover rect{fill:#1b3041}.flow-label{outline:none}.route-caption{font-size:12px;fill:#68869d;letter-spacing:2px;text-anchor:middle}.section-label{font-size:10px;color:#6d8ba3;letter-spacing:1.6px;font-weight:700;margin:4px 4px 12px}.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.tile{border:1px solid color-mix(in srgb,var(--tone) 40%,#142333);border-radius:16px;background:linear-gradient(120deg,color-mix(in srgb,var(--tone) 7%,#0a1522),#0b1521);padding:16px 13px;display:flex;align-items:center;gap:11px;text-align:left;min-height:105px;transition:border-color .2s,background .2s,transform .2s}.tile:hover{border-color:var(--tone);background:color-mix(in srgb,var(--tone) 12%,#0a1522);transform:translateY(-1px)}.icon{width:32px;height:36px;flex-shrink:0;filter:drop-shadow(0 0 5px color-mix(in srgb,currentColor 30%,transparent))}.tile-body{display:flex;flex:1;min-width:0;flex-direction:column;gap:4px}.tile-title{color:#b4c7d8;font-size:12px;line-height:1.35}.tile strong{font-size:24px;line-height:1.1;color:#f4f7fd;font-weight:700;letter-spacing:-.6px;white-space:nowrap;font-variant-numeric:tabular-nums}.unit{font-size:.53em;font-weight:500;color:#97adc1;margin-left:4px;letter-spacing:0}.tile small{color:#6c849a;font-size:10px}.arrow{font-size:22px;opacity:.6}.battery-summary{display:block;cursor:default;padding:15px}.battery-title{display:flex;align-items:center;gap:8px;font-size:12px;color:#b7d1d4;margin-bottom:10px}.battery-title .icon{width:20px;height:24px}.battery-main{display:flex;align-items:baseline;justify-content:space-between;gap:6px}.plain-value{border:0;background:none;padding:0;text-align:left}.plain-value strong{font-size:25px}.capacity{font-size:10px;color:#72919d}.bar{height:4px;background:#20353c;border-radius:4px;overflow:hidden;margin:11px 0}.bar span{display:block;height:100%;width:0;background:var(--battery);transition:width 1s}.mini-row{display:grid;grid-template-columns:1fr 1fr;gap:7px}.mini{display:flex;flex-direction:column;align-items:flex-start;gap:3px;border:0;background:none;padding:0}.mini>span{font-size:9px;color:#7796a5}.mini strong{font-size:14px;letter-spacing:0;white-space:nowrap}.mini:hover strong,.plain-value:hover strong{text-decoration:underline;text-underline-offset:4px}.battery-summary{grid-column:span 1}.charge-tile{grid-column:span 1}.note{font-size:11px;line-height:1.6;color:#7690a8;margin:15px 3px 0}.calibration{display:none;padding:10px 13px;background:#49391b55;border:1px solid #6b512f;border-radius:12px;color:#ebcd93;font-size:11px;line-height:1.5;margin-top:12px}.calibration.visible{display:block}details{border-top:1px solid #213143;margin-top:16px;padding-top:12px;font-size:11px;color:#819bb0}summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;color:#90adc1}summary::after{content:'+';font-size:18px}details[open] summary::after{content:'−'}details p{line-height:1.7;max-width:780px}.calibrate{border:1px solid #2c6e60;border-radius:10px;background:#10392f;color:#74e9c3;padding:9px 13px;font-size:11px}.calibrate:disabled{opacity:.5;cursor:wait}.last-full{font-size:10px;color:#6c899d;margin-left:10px}.toast{font-size:11px;color:#a5dece;margin-top:8px;min-height:14px}footer{display:flex;justify-content:space-between;gap:10px;color:#4f6c83;font-size:9px;margin-top:16px;letter-spacing:.5px}.battery-extra{display:flex;justify-content:space-between;gap:8px;margin-top:8px;font-size:9px;color:#6e909d}.battery-extra button{background:none;border:0;padding:0;color:#a0bbca;font-size:10px}.battery-extra button:hover{text-decoration:underline}
+      .diagram{width:100%;max-width:900px;display:block;margin:auto;overflow:visible}.scene{opacity:.36}.node-bg{fill:#081522;stroke:currentColor;stroke-width:1.6}.node{filter:drop-shadow(0 0 8px color-mix(in srgb,currentColor 15%,transparent));transition:filter .2s}.node:hover{filter:drop-shadow(0 0 10px currentColor)}.node-name{font-size:17px;fill:#c2cfde;font-weight:500}.node-value{font-size:26px;fill:#f6faff;font-weight:750;font-variant-numeric:tabular-nums;letter-spacing:-.5px}.node-unit{font-size:13px;fill:#7f99ad}.chev{fill:none;stroke:currentColor;stroke-width:2;opacity:.75}.crossing-gap{fill:none;stroke:#0b1727;stroke-width:8;stroke-linecap:round}.track{fill:none;stroke:currentColor;stroke-width:3;opacity:.1;stroke-linejoin:round}.wire{fill:none;stroke:currentColor;stroke-width:2;opacity:.22;stroke-linejoin:round}.moving{fill:none;stroke:currentColor;stroke-width:3;stroke-dasharray:5 16;stroke-linecap:round;stroke-linejoin:round;opacity:0}.flow.active .wire{opacity:.7;filter:drop-shadow(0 0 5px currentColor)}.flow.active .moving{opacity:1;animation:current 1.6s linear infinite}.flow-label rect{fill:#0b1725;stroke:currentColor;stroke-opacity:.4;stroke-width:1.2}.flow-label text{fill:#c8d5e4;font-size:19px;font-weight:650;font-variant-numeric:tabular-nums}.flow.active .flow-label rect{stroke-opacity:.8}.flow.active .flow-label text{fill:#f6faff}.flow-unit{font-size:13px}.flow-label:hover rect{fill:#1b3041}.flow-label{outline:none}.route-caption{font-size:12px;fill:#68869d;letter-spacing:2px;text-anchor:middle}.section-label{font-size:10px;color:#6d8ba3;letter-spacing:1.6px;font-weight:700;margin:4px 4px 12px}.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.tile{border:1px solid color-mix(in srgb,var(--tone) 40%,#142333);border-radius:16px;background:linear-gradient(120deg,color-mix(in srgb,var(--tone) 7%,#0a1522),#0b1521);padding:16px 13px;display:flex;align-items:center;gap:11px;text-align:left;min-height:105px;transition:border-color .2s,background .2s,transform .2s}.tile:hover{border-color:var(--tone);background:color-mix(in srgb,var(--tone) 12%,#0a1522);transform:translateY(-1px)}.icon{width:32px;height:36px;flex-shrink:0;filter:drop-shadow(0 0 5px color-mix(in srgb,currentColor 30%,transparent))}.tile-body{display:flex;flex:1;min-width:0;flex-direction:column;gap:4px}.tile-title{color:#b4c7d8;font-size:12px;line-height:1.35}.tile strong{font-size:24px;line-height:1.1;color:#f4f7fd;font-weight:700;letter-spacing:-.6px;white-space:nowrap;font-variant-numeric:tabular-nums}.unit{font-size:.53em;font-weight:500;color:#97adc1;margin-left:4px;letter-spacing:0}.tile small{color:#6c849a;font-size:10px}.arrow{font-size:22px;opacity:.6}.battery-summary{display:block;cursor:default;padding:15px}.battery-title{display:flex;align-items:center;gap:8px;font-size:12px;color:#b7d1d4;margin-bottom:10px}.battery-title .icon{width:20px;height:24px}.battery-main{display:flex;align-items:baseline;justify-content:space-between;gap:6px}.plain-value{border:0;background:none;padding:0;text-align:left}.plain-value strong{font-size:25px}.capacity{font-size:10px;color:#72919d}.bar{height:4px;background:#20353c;border-radius:4px;overflow:hidden;margin:11px 0}.bar span{display:block;height:100%;width:0;background:var(--battery);transition:width 1s}.mini-row{display:grid;grid-template-columns:1fr 1fr;gap:7px}.mini{display:flex;flex-direction:column;align-items:flex-start;gap:3px;border:0;background:none;padding:0}.mini>span{font-size:9px;color:#7796a5}.mini strong{font-size:14px;letter-spacing:0;white-space:nowrap}.mini:hover strong,.plain-value:hover strong{text-decoration:underline;text-underline-offset:4px}.battery-summary{grid-column:span 1}.charge-tile{grid-column:span 1}.note{font-size:11px;line-height:1.6;color:#7690a8;margin:15px 3px 0}.calibration{display:none;padding:10px 13px;background:#49391b55;border:1px solid #6b512f;border-radius:12px;color:#ebcd93;font-size:11px;line-height:1.5;margin-top:12px}.calibration.visible{display:block}details{border-top:1px solid #213143;margin-top:16px;padding-top:12px;font-size:11px;color:#819bb0}summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;color:#90adc1}summary::after{content:'+';font-size:18px}details[open] summary::after{content:'−'}details p{line-height:1.7;max-width:780px}.calibrate{border:1px solid #2c6e60;border-radius:10px;background:#10392f;color:#74e9c3;padding:9px 13px;font-size:11px}.calibrate:disabled{opacity:.5;cursor:wait}.last-full{font-size:10px;color:#6c899d;margin-left:10px}.toast{font-size:11px;color:#a5dece;margin-top:8px;min-height:14px}footer{display:flex;justify-content:space-between;gap:10px;color:#4f6c83;font-size:9px;margin-top:16px;letter-spacing:.5px}.battery-extra{display:flex;justify-content:space-between;gap:8px;margin-top:8px;font-size:9px;color:#6e909d}.battery-extra button{background:none;border:0;padding:0;color:#a0bbca;font-size:10px}.battery-extra button:hover{text-decoration:underline}
       .charge-tile>.tile{width:100%;height:100%}.flow[data-flow=battery_load] .flow-label text{font-size:16px}
       .node-metrics{font-size:11px;fill:#9bb2c7;font-variant-numeric:tabular-nums}.node-runtime{font-size:10px;fill:#60d6b7;font-variant-numeric:tabular-nums}.node-metrics [role=button]:hover{fill:white}.runtime{display:block;border:0;background:transparent;color:#67cbb3;font-size:10px;padding:7px 0 0;text-align:left;font-variant-numeric:tabular-nums}.runtime:hover{text-decoration:underline}.battery-main{flex-wrap:wrap}.runtime{grid-column:1;grid-row:3}.battery-summary .bar{grid-row:4}.battery-summary .mini-row{grid-row:2/5}.battery-summary .battery-extra{grid-row:5}
       @keyframes current{to{stroke-dashoffset:-42}}@media(prefers-reduced-motion:reduce){.flow.active .moving{animation:none}.tile,.bar span{transition:none}}
@@ -137,7 +139,7 @@ class EnergetikaCard extends HTMLElement {
         .diagram-stage>.node{padding:8px;gap:3px}.node-heading{min-height:20px}.node-reading .node-value{font-size:28px}.node>.node-metrics{font-size:14px;gap:9px}.node>.node-runtime{font-size:13px}.node>.grid-timer{font-size:12px}
         .flow-panel{grid-column:2;grid-row:1;display:flex;flex-direction:column;min-height:0}.flow-panel>.section-label{font-size:10px;margin:8px 0 8px;line-height:20px}.flow-panel>.tiles{flex:1;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:7px;min-height:0}.flow-panel .tile{min-height:0;padding:9px 10px;gap:9px;border-radius:13px}.flow-panel .tile>.icon{width:24px;height:28px}.flow-panel .tile-title{font-size:12px;white-space:normal}.flow-panel .tile strong{font-size:27px;line-height:1.1;padding-left:0}.flow-panel .tile-body{gap:4px}.flow-panel .tile .arrow{display:none}.flow-panel .charge-tile{grid-row:auto;grid-column:1/-1}
         .overview>.battery-summary{grid-column:1/-1;grid-row:2;margin:0;padding:10px 14px}.battery-top{margin-bottom:6px}.battery-main .plain-value strong{font-size:30px}.battery-layout{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)}.battery-layout .mini strong{font-size:23px}.voltage-limits{margin-top:7px}.battery-bottom{margin-top:6px}
-        .note,footer{display:none}.overview-actions{display:flex;align-items:flex-start;gap:12px;margin-top:8px}.overview-actions>details{flex:1;min-width:0;margin:0;padding-top:6px}.overview-actions>energetika-automation-panel{flex:1;min-width:0;margin-top:0}
+        .note,footer{display:none}.overview-actions{display:flex;align-items:flex-start;gap:12px;margin-top:8px}.overview-actions>details{flex:1;min-width:0;margin:0;padding-top:6px}.overview-actions>energetika-automation-panel,.overview-actions>energetika-data-panel{flex:1;min-width:0;margin-top:0}
       }
       @media(min-width:1400px) and (min-height:601px){.flow-panel>.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}.flow-panel .charge-tile{grid-column:auto}.flow-panel .tile strong{font-size:32px}.flow-panel .tile-title{font-size:13px}.overview{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:12px 20px}.shell{padding:18px}}
       @media(min-width:800px) and (max-height:760px) and (min-height:601px){.shell{padding:10px 12px}.diagram-stage>.node{padding:6px;gap:2px}.node-heading{min-height:18px}.node-symbol>.icon,.node-symbol>.grid-cross{width:18px;height:18px}.node-heading .node-name{font-size:13px}.node-reading .node-value{font-size:25px}.flow-panel .tile{padding:7px 9px}.flow-panel .tile-title{font-size:11px}.flow-panel .tile strong{font-size:24px}.first-screen>header h1{font-size:23px}}
@@ -156,10 +158,10 @@ class EnergetikaCard extends HTMLElement {
     </div><div class="diagram-stage">
     <svg class="diagram" viewBox="0 0 440 300" preserveAspectRatio="none" aria-label="Направления потоков энергии">
       <defs>${['solar','grid','battery'].map(c=>`<marker id="arrow-${c}" markerWidth="4" markerHeight="4" refX="3.5" refY="2" orient="auto"><path d="M0 0 4 2 0 4Z" fill="var(--${c})"/></marker>`).join('')}</defs>
-      ${this._flow('grid_load','M8 54H1V286H350V268','grid')}
       ${this._flow('grid_battery','M54 114V154','grid')}
       ${this._flow('pv_battery','M268 54H220V135H136V154','solar')}
       ${this._flow('pv_load','M350 114V154','solar')}
+      ${this._flow('grid_load','M172 54H194V125C182 125 182 145 194 145V174H268','grid')}
       ${this._flow('battery_load','M172 211H268','battery')}
     </svg>
       ${this._node('grid','Сеть','grid',8,0,164,'grid')}
@@ -170,7 +172,7 @@ class EnergetikaCard extends HTMLElement {
       ${this._flowLabel('pv_battery',220,105,'solar','Солнце → АКБ')}
       ${this._flowLabel('pv_load',350,134,'solar','Солнце → нагрузка')}
       ${this._flowLabel('battery_load',220,211,'battery','АКБ → нагрузка')}
-      ${this._flowLabel('grid_load',220,286,'grid','Сеть → нагрузка, байпас')}
+      ${this._flowLabel('grid_load',230,174,'grid','Сеть → нагрузка, байпас')}
     </div></div>
     <section class="flow-panel"><div class="section-label">ПОТОКИ МОЩНОСТИ <span style="color:#3f5e76">/ НАЖМИТЕ НА ЧИСЛО ДЛЯ ИСТОРИИ</span></div>
     <div class="tiles">
@@ -194,9 +196,9 @@ class EnergetikaCard extends HTMLElement {
 
     <div class="note">Стрелки движутся в направлении передачи энергии. Ток сети ≈ P/U (оценка активного тока). Таймер — по текущему разряду до резерва 20%, при смене нагрузки пересчитывается. Распределение потоков — расчёт интеграции инвертора; разница с нагрузкой может включать потери и собственное потребление.</div>
     <div class="overview-actions"><details><summary>Об аккумуляторе <span class="main-status" data-main-status></span></summary><div data-voltage-only hidden><p>В режиме «По напряжению» слева показано текущее напряжение АКБ, справа — линейная оценка заряда в процентах. Шкала заполняется от нижнего порога автономной работы из настроек инвертора до 29,0 В. Красная граница — нижний порог, зелёная — верхний.</p><p>Оценка зависит от нагрузки и не является точным показанием BMS. При недоступном напряжении или неверных границах процент не рассчитывается.</p><p>Штатная оценка инвертора: <button class="plain-value" data-key="inverter_percent"><span data-value="inverter_percent">—</span>%</button>.</p></div><div data-energy-only><div class="calibration" data-calibration></div><p>Режим «Энергия» — остаток по мощности и времени. Режим «По напряжению» — линейная оценка от нижнего порога автономной работы до 29,0 В: она зависит от нагрузки и не меняет счётчик Вт·ч. Выбор сохраняется на этом устройстве. Таймер в режиме «Энергия» рассчитан по учтённой энергии. Максимальный разряд АКБ — 100 А, номинально 2,56 кВт при 25,6 В; доступная мощность на выходе AC ниже из-за потерь.</p><p>Штатная оценка инвертора: <button class="plain-value" data-key="inverter_percent"><span data-value="inverter_percent">—</span>%</button> · <button class="plain-value" data-key="inverter_energy"><span data-value="inverter_energy">—</span> Вт·ч</button>.</p><p>Номинальная энергия — <b>2560 Вт·ч</b>. Счётчик складывает энергию заряда и вычитает энергию разряда: мощность × время. Например, 500 Вт в течение часа — 500 Вт·ч. Напряжение и процент инвертора показаны отдельно и не пересчитывают этот остаток. Значение сохраняется на сервере и считается при закрытой панели.</p><p>После подтверждённого полного заряда остаток устанавливается в 2560 Вт·ч. Автокалибровка: верхнее напряжение держалось минуту, затем малый чистый ток (до 2 А) и мощность по модулю до 60 Вт держатся 5 минут. Поддерживающее напряжение учитывается только после верхнего в том же цикле, без устойчивого разряда мощнее 60 Вт. Малый ток может быть положительным или отрицательным: например, −1,4 А и −39 Вт после заряда не сбрасывают ожидание. Потеря свежих данных более 2 минут, отключение АКБ или изменение Bulk/Float отменяют сохранённый признак. Один малый ток при 27,2 В не подтверждает полный заряд. В режиме «Энергия» шкала показывает оставшиеся Вт·ч из 2560; в режиме «По напряжению» — положение напряжения между нижним порогом и 29,0 В. Это оценка полного заряда, поскольку сигнала BMS нет. Кнопку используйте только когда уверены, что аккумулятор заряжен полностью.</p><button class="calibrate" data-calibrate>АКБ полностью заряжена</button><span class="last-full" data-last-full></span><p class="last-full" data-calibration-status role="status"></p><div class="toast" role="status" data-toast></div></div></details>
-    <energetika-automation-panel></energetika-automation-panel></div><footer><span>ЛОКАЛЬНЫЙ МОНИТОРИНГ</span><span data-updated>Ожидание данных</span></footer><energetika-settings-panel></energetika-settings-panel></ha-card>`;
+    <energetika-automation-panel></energetika-automation-panel><energetika-data-panel></energetika-data-panel></div><footer><span>ЛОКАЛЬНЫЙ МОНИТОРИНГ</span><span data-updated>Ожидание данных</span></footer><energetika-settings-panel></energetika-settings-panel><energetika-history-dialog></energetika-history-dialog></ha-card>`;
     root.querySelectorAll('[data-key]').forEach(el=>{
-      const open = e=>{e.stopPropagation();this._moreInfo(el.dataset.key);};
+      const open = e=>{e.stopPropagation();this._moreInfo(el.dataset.key,el);};
       el.addEventListener('click',open);
       if (el.tagName.toLowerCase() !== 'button') el.addEventListener('keydown',e=>{if(e.target===el&&(e.key==='Enter'||e.key===' ')){e.preventDefault();open(e);}});
     });
@@ -206,7 +208,7 @@ class EnergetikaCard extends HTMLElement {
       this._update();
     }));
     const gridTimer=root.querySelector('[data-grid-timer]');
-    const openDtek=event=>{event.stopPropagation();const panel=root.querySelector('energetika-automation-panel');panel.hass=this._hass;panel.open('dtek');};
+    const openDtek=event=>{event.stopPropagation();const panel=root.querySelector('energetika-data-panel');panel.hass=this._hass;panel.open('dtek');};
     gridTimer.addEventListener('click',openDtek);
     root.querySelector('energetika-alerts-panel').configure({entity:this.config?.alerts_entity,script:this.config?.alerts_script});
     const settings=root.querySelector('energetika-settings-panel');
@@ -235,6 +237,8 @@ class EnergetikaCard extends HTMLElement {
     r.querySelector('energetika-alerts-panel').hass=this._hass;
     r.querySelector('energetika-settings-panel').hass=this._hass;
     r.querySelector('energetika-automation-panel').hass=this._hass;
+    r.querySelector('energetika-data-panel').hass=this._hass;
+    r.querySelector('energetika-history-dialog').hass=this._hass;
     this._updateSourceMode();
     this._updateGrid();
     r.querySelectorAll('[data-value]').forEach(el=>{
@@ -250,7 +254,7 @@ class EnergetikaCard extends HTMLElement {
     const remaining=this._number('battery'),voltage=this._number('voltage'),low=this._number('voltage_min'),high=29;
     const energyPct=remaining===null?null:remaining/2560*100;
     const voltagePct=voltage!==null&&low!==null&&low<high?Math.min(100,Math.max(0,(voltage-low)/(high-low)*100)):null;
-    const primaryKey=voltageMode?'voltage':'battery',secondaryKey=voltageMode?'percent_voltage':'percent';
+    const primaryKey=voltageMode?'voltage':'battery_energy',secondaryKey=voltageMode?'percent_voltage':'percent';
     const primary=voltageMode?voltage:remaining,pct=voltageMode?voltagePct:energyPct;
     const format=(n,digits=0)=>n===null?'—':n.toLocaleString('ru-RU',{minimumFractionDigits:digits,maximumFractionDigits:digits});
     r.querySelector('[data-primary]').dataset.key=primaryKey;
@@ -271,7 +275,7 @@ class EnergetikaCard extends HTMLElement {
     minLabel.textContent=`${format(minimum,voltageMode?1:0)} ${unit}`;
     maxLabel.textContent=`${format(maximum,voltageMode?1:0)} ${unit}`;
     minLabel.classList.toggle('voltage-min',voltageMode);
-    minLabel.dataset.key=voltageMode?'voltage_min':'battery';maxLabel.dataset.key=primaryKey;
+    minLabel.dataset.key=voltageMode?'voltage_min':'battery_energy';maxLabel.dataset.key=primaryKey;
     minLabel.title=voltageMode?'Нижний порог автономной работы · открыть историю':'Нулевая учтённая энергия · открыть историю';
     maxLabel.title=voltageMode?'Верхняя граница оценки: 29,0 В · история напряжения':'Полная номинальная энергия АКБ · открыть историю';
     r.querySelector('[data-battery-bar]').style.width=`${Math.min(100,Math.max(0,pct??0))}%`;
@@ -406,9 +410,30 @@ class EnergetikaCard extends HTMLElement {
       this._updateSourceMode();
     }
   }
-  _moreInfo(key) {
-    const entityId=this._entities[key];if(!entityId)return;
-    this.dispatchEvent(new CustomEvent('hass-more-info',{detail:{entityId},bubbles:true,composed:true}));
+  _moreInfo(key,opener) {
+    const palette={solar:'#ffd65a',grid:'#38bfff',load:'#bc7bff',battery:'#52b788',discharge:'#f9844a'};
+    const definitions={
+      grid:['Сеть · мощность','Вт','grid',-11000,11000],solar:['Солнце · мощность','Вт','solar',0,5400],load:['Нагрузка дома','Вт','load',0,8400],
+      pv_battery:['Солнце → АКБ','Вт','solar',0,5400],pv_load:['Солнце → нагрузка','Вт','solar',0,5400],
+      grid_battery:['Сеть → АКБ','Вт','grid',0,8400],grid_load:['Сеть → нагрузка','Вт','grid',0,11000],battery_load:['АКБ → нагрузка','Вт','discharge',0,8400],
+      grid_voltage:['Напряжение сети','В','grid',0,300],grid_current:['Ток сети · оценка P/U','А','grid',-60,60],
+      solar_voltage:['Напряжение панелей','В','solar',0,550],solar_current:['Ток панелей','А','solar',0,100],
+      load_voltage:['Выходное напряжение','В','load',0,300],load_current:['Выходной ток','А','load',0,60],
+      voltage:['Напряжение АКБ','В','battery',0,40],voltage_min:['Нижний порог АКБ','В','battery',0,40],current:['Ток АКБ','А','battery',-250,250],
+      battery_energy:['Остаток энергии АКБ','Вт·ч','battery',0,2560],inverter_energy:['Энергия АКБ · оценка инвертора','Вт·ч','battery',0,2560],
+      percent:['Заряд АКБ · по энергии','%','battery',0,100],percent_voltage:['Заряд АКБ · по напряжению','%','battery',0,100],inverter_percent:['Заряд АКБ · оценка инвертора','%','battery',0,100],
+      runtime:['Время работы до 20%','мин','battery',0,100000],used:['Израсходованная энергия АКБ','Вт·ч','battery',0,2560],
+    };
+    let config;
+    if(['battery','battery_power','charge','discharge'].includes(key)){
+      config={title:'Заряд и разряд аккумулятора',unit:'Вт',entities:[{entity:this._entities.charge,name:'Зарядка АКБ',color:palette.battery,minimum:0,maximum:8400},{entity:this._entities.discharge,name:'Разрядка АКБ',color:palette.discharge,minimum:0,maximum:8400}]};
+    }else{
+      const definition=definitions[key],entity=this._entities[key];if(!entity)return;
+      if(!definition){this.dispatchEvent(new CustomEvent('hass-more-info',{detail:{entityId:entity},bubbles:true,composed:true}));return;}
+      const [name,unit,tone,minimum,maximum]=definition;
+      config={title:name,unit,entities:[{entity,name,color:palette[tone],minimum,maximum}]};
+    }
+    this.shadowRoot.querySelector('energetika-history-dialog').open(this._hass,config,opener);
   }
   async _calibrate() {
     if (!this._hass || !window.confirm('АКБ действительно полностью заряжена? Остаток будет установлен в 2560 Вт·ч, накопленный расход обнулится.')) return;

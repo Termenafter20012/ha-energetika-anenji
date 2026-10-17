@@ -1,41 +1,22 @@
-import './energetika-dtek.js?v=2.8.0';
-import './energetika-hourly.js?v=2.8.0';
 /* Home Assistant owns all timers and switching. This component is only a UI. */
 const P='sensor.anenji_4200_protocol_1_';
 const AUTO='input_boolean.energetika_solar_auto';
-const WEATHER='sensor.energetika_solar_weather';
-const PV_DAY=P+'estimated_pv_energy_today';
 const MODE='select.anenji_4200_protocol_1_output_source_priority';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=value=>value!==null&&value!==undefined&&value!==''&&Number.isFinite(Number(value))?Number(value):null;
 const fmt=(v,d=0)=>num(v)===null?'—':Number(v).toLocaleString('ru-RU',{maximumFractionDigits:d});
-const dayKey=value=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Kyiv',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value));
-const dayLabel=key=>new Date(key+'T12:00:00').toLocaleDateString('ru-RU',{weekday:'short',day:'numeric',month:'short'});
-function weather(code,night=false){
-  if(night)return ['☾','Ночь'];
-  if(code===0)return ['☀','Ясно'];
-  if(code===1)return ['🌤','Преимущественно ясно'];
-  if(code===2)return ['⛅','Переменная облачность'];
-  if(code===3)return ['☁','Пасмурно'];
-  if([45,48].includes(code))return ['≋','Туман'];
-  if(code>=95)return ['⛈','Гроза'];
-  if(code>=71&&code<=77||code===85||code===86)return ['❄','Снег'];
-  if(code>=51&&code<=82)return ['🌧','Осадки'];
-  return ['◌','Нет данных'];
-}
 const FIELDS=[
   ['start_watts','Порог солнца','Вт',300,1500,50,'SBU разрешён при этой средней мощности либо при достаточном покрытии фоновой нагрузки.'],
   ['coverage_target','Покрытие фона','%',70,100,5,'Доля фоновой нагрузки 400–700 Вт, которую должно покрывать солнце. Обычно 85%.'],
   ['entry_reserve','Заряд для входа в SBU','%',30,80,5,'Минимальный остаток по энергии для входа в SBU. При 25% автоматика возвращает SUB.'],
-  ['losses','Потери для прогноза','%',5,50,1,'Поправка на нагрев, загрязнение, проводку и преобразование. Влияет на прогноз, не меняет инвертор.'],
 ];
 
 class EnergetikaAutomationPanel extends HTMLElement {
-  constructor(){super();this.attachShadow({mode:'open'});this._tab='control';this._history=[];}
+  constructor(){super();this.attachShadow({mode:'open'});}
   connectedCallback(){if(!this.shadowRoot.firstChild)this._render();}
   disconnectedCallback(){clearInterval(this._timer);}
   set hass(value){this._hass=value;if(!this.shadowRoot.firstChild)this._render();this._sync();}
-  open(tab=this._tab||'control'){if(!this.shadowRoot.firstChild)this._render();this._selectTab(tab);const dialog=this.shadowRoot.querySelector('dialog');if(!dialog.open)dialog.showModal();this._sync();clearInterval(this._timer);this._timer=setInterval(()=>this._sync(),30000);}
+  open(){if(!this.shadowRoot.firstChild)this._render();const dialog=this.shadowRoot.querySelector('dialog');if(!dialog.open)dialog.showModal();this._sync();clearInterval(this._timer);this._timer=setInterval(()=>this._sync(),30000);}
   _state(id){return this._hass?.states[id]?.state;}
   _attrs(id){return this._hass?.states[id]?.attributes||{};}
   _render(){
@@ -48,27 +29,22 @@ class EnergetikaAutomationPanel extends HTMLElement {
       .phone-row{display:flex;align-items:center;gap:7px;margin:10px 0}.phone-row select{flex:1;min-width:0;padding:9px;border:1px solid #335468;border-radius:9px;background:#071a28;color:#d8edf6;font-size:12px}.notify-option{border-top:1px solid #233f50;padding-top:11px;margin-top:10px}.notify-option h3{margin-bottom:3px}.notification-info{font-size:10px;color:#7fabbc;line-height:1.6}
       .weather-refresh{display:block;margin:5px 0 0 auto;background:#123443;border:1px solid #315e71;border-radius:8px;color:#8ed8e6;padding:3px 8px;font-size:16px}
     </style>
-    <button class="launcher" aria-haspopup="dialog" data-open><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m13 2-9 12h7l-1 8 10-13h-8Z"/></svg><span><strong>Автоматизации</strong><small data-brief>Одесса · погода и солнечная выработка</small></span><span class="badge" data-badge>Вручную</span><span class="chevron">›</span></button>
-    <dialog aria-labelledby="auto-title"><div class="head"><div class="eyebrow">ЭНЕРГЕТИКА / УМНОЕ ПИТАНИЕ</div><div class="head-row"><h2 id="auto-title">Автоматизации</h2><button class="close" aria-label="Закрыть автоматизации">×</button></div><div class="tabs" role="tablist" aria-label="Разделы автоматизации"><button role="tab" data-tab="control" aria-controls="auto-control" id="tab-control" aria-selected="true">Управление</button><button role="tab" data-tab="forecast" aria-controls="auto-forecast" id="tab-forecast" aria-selected="false">Прогноз</button><button role="tab" data-tab="dtek" aria-controls="auto-dtek" id="tab-dtek" aria-selected="false">ДТЭК</button><button role="tab" data-tab="history" aria-controls="auto-history" id="tab-history" aria-selected="false">Выработка</button></div></div>
-    <div class="body"><div class="weather"><span class="weather-icon" data-weather-icon>◌</span><div><h3>Одесса</h3><p data-weather-text>Ожидание погоды</p><p data-weather-meta></p></div><div class="temperature"><span data-temperature>—</span><small> °C</small><button class="weather-refresh" data-weather-refresh aria-label="Обновить погоду" title="Получить погоду сейчас">↻</button></div></div>
-    <section id="auto-control" role="tabpanel" aria-labelledby="tab-control" data-section="control">
+    <button class="launcher" aria-haspopup="dialog" data-open><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m13 2-9 12h7l-1 8 10-13h-8Z"/></svg><span><strong>Автоматизации</strong><small data-brief>SBU / SUB · уведомления</small></span><span class="badge" data-badge>Вручную</span><span class="chevron">›</span></button>
+    <dialog aria-labelledby="auto-title"><div class="head"><div class="eyebrow">ЭНЕРГЕТИКА / УМНОЕ ПИТАНИЕ</div><div class="head-row"><h2 id="auto-title">Автоматизации</h2><button class="close" aria-label="Закрыть автоматизации">×</button></div></div>
+    <div class="body">
+    <section id="auto-control" data-section="control">
       <div class="box"><div class="switch-row"><div><h3>Солнечный SBU / SUB</h3><p>Работает в Home Assistant, даже когда панель закрыта.</p></div><button class="toggle" data-enable aria-pressed="false">Выключено</button></div><div class="state-line"><span>Инвертор: <b data-mode>—</b></span><span>Решение: <b data-target>—</b></span></div><p class="reason" data-reason></p><div class="status" data-status role="status"></div><div class="actions"><button class="action secondary" data-pause>Пауза на час</button><button class="action" data-resume>Возобновить</button></div></div>
       <div class="metrics"><div class="metric sun"><span>Солнце · среднее 5 мин</span><strong data-pv>—</strong><small> Вт</small></div><div class="metric"><span>Фоновая нагрузка</span><strong data-baseline>—</strong><small> Вт</small></div><div class="metric sun"><span>Солнце покрывает фон</span><strong data-coverage>—</strong><small> %</small></div><div class="metric battery"><span>Остаток АКБ по энергии</span><strong data-energy>—</strong><small> %</small></div></div>
       <div class="box"><h3>Условия переключения</h3><div class="fields">${FIELDS.map(([key,label,unit,min,max,step,hint])=>`<div class="field"><label for="field-${key}">${esc(label)}</label><div class="input-row"><input id="field-${key}" data-field="${key}" type="number" min="${min}" max="${max}" step="${step}" inputmode="decimal"><span>${unit}</span></div><p class="hint">${esc(hint)}</p></div>`).join('')}</div><div class="switch-row early"><div><h3>Ранний старт в ясный день</h3><p>От 120 Вт, АКБ ≥50% и прогноз на ближайшие 2 часа покрывает фон.</p></div><button class="toggle" data-early aria-pressed="false">Выкл.</button></div><div class="actions"><button class="action" data-save>Сохранить условия</button></div><p class="notification" data-feedback role="status"></p></div>
       <div class="box"><h3>Уведомления на телефон</h3><p class="notification-info">Home Assistant сообщит о пропадании и восстановлении сети, а также о подтверждённых автоматических переходах SBU/SUB.</p><div class="phone-row"><select data-phone aria-label="Телефон для уведомлений"></select><button class="action" data-phone-save>Сохранить</button></div><p class="notification-info" data-phone-status></p><div class="switch-row notify-option"><div><h3>Сеть пропала / появилась</h3><p>С подтверждением устойчивого изменения, без реакции на потерю связи.</p></div><button class="toggle" data-notify-grid aria-pressed="false">Выкл.</button></div><div class="switch-row notify-option"><div><h3>Автоматика SBU / SUB</h3><p>После подтверждения режима. При сбое переключения тоже придёт сообщение.</p></div><button class="toggle" data-notify-modes aria-pressed="false">Выкл.</button></div><p class="notification-info">Для доставки нужны работающие Home Assistant, интернет и разрешённые уведомления Companion App.</p></div>
       <div class="box details"><details><summary>Как выбирается режим</summary><p><b>SBU:</b> ясно или переменная облачность, солнце достигло порога либо покрыло нужную долю фона. Условие держится 5 минут. АКБ сглаживает короткие пики дома.</p><p><b>SUB:</b> ночь, резерв АКБ 25% или напряжение приблизилось к нижнему порогу. Пасмурная погода, слабое солнце или потеря данных возвращают SUB после 10 минут. Между обычными переключениями — минимум 10 минут.</p><p>Фон — нижняя четверть показаний дома за 30 минут, ограниченная диапазоном 400–700 Вт. Короткий пик чайника не становится новым фоном. Погода — модель для Одессы, обновление раз в 15 минут. SBU не включается по устаревшей погоде.</p><p>Ручной выбор режима в этой панели ставит автоматику на паузу на час. Внешние изменения с LCD или из других карточек не распознаются как пауза: сначала выключите автоматику здесь. При неподтверждённой команде автоматические записи останавливаются до «Возобновить».</p><p>При отключённой автоматике текущий режим сохраняется. Автоматика меняет только SBU/SUB. Напряжения, токи заряда и частота не меняются.</p></details></div><p class="result" data-result></p>
     </section>
-    <section id="auto-forecast" role="tabpanel" aria-labelledby="tab-forecast" data-section="forecast" hidden><energetika-hourly-charts></energetika-hourly-charts><div class="box"><h3>Солнечная установка</h3><p class="reason">4 × 630 Вт · <b>2,52 кВт</b> · горизонтально, 0°</p><p class="footnote">При горизонтальном положении направление «юг» не меняет наклон поверхности.</p><div class="state-line"><span>Сегодня по прогнозу</span><b><span data-today-forecast>—</span> кВт·ч</b></div><div class="state-line"><span>Ближайшие 2 часа · среднее</span><b><span data-next-hours>—</span> Вт</b></div></div><div data-forecast-days></div><p class="footnote">Оценка: солнечное излучение × 2,52 кВт × поправка на потери. Тени, снег и реальные условия панелей могут заметно изменить результат. <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Погода Open-Meteo</a> · CC BY 4.0.</p></section>
-    <section id="auto-history" role="tabpanel" aria-labelledby="tab-history" data-section="history" hidden><div class="box"><h3>Солнце · сегодня</h3><div class="live-actual"><span data-today-actual>—</span> <small>кВт·ч</small></div><p class="footnote">Только выработка панелей. Энергия от сети сюда не входит.</p></div><div class="section-heading"><h3>Предыдущие 7 дней</h3><button class="action secondary" data-refresh aria-label="Обновить солнечную историю">↻ Обновить</button></div><div data-history-days></div><p class="message" data-history-message></p><p class="footnote">Данные солнечного счётчика EyeBond Local, рассчитанного по мощности PV. Дни с перерывами связи могут быть неполными. Для дня без записей показан прочерк.</p></section>
-    <section id="auto-dtek" role="tabpanel" aria-labelledby="tab-dtek" data-section="dtek" hidden><energetika-dtek-panel></energetika-dtek-panel></section>
     </div></dialog>`;
     const r=this.shadowRoot,dialog=r.querySelector('dialog');
     r.querySelector('[data-open]').onclick=()=>this.open();
     r.querySelector('.close').onclick=()=>dialog.close();
-    dialog.addEventListener('close',()=>{r.querySelector('energetika-hourly-charts').active=false;r.querySelector('energetika-dtek-panel').active=false;clearInterval(this._timer);r.querySelector('[data-open]').focus();});
+    dialog.addEventListener('close',()=>{clearInterval(this._timer);r.querySelector('[data-open]').focus();});
     dialog.addEventListener('click',e=>{if(e.target===dialog){const b=dialog.getBoundingClientRect();if(e.clientX<b.left||e.clientX>b.right||e.clientY<b.top||e.clientY>b.bottom)dialog.close();}});
-    r.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>this._selectTab(b.dataset.tab));
-    r.querySelector('[data-weather-refresh]').onclick=()=>this._command('homeassistant','update_entity',{entity_id:WEATHER},'Запрос погоды выполнен. Данные обновятся после ответа сервиса.');
     r.querySelector('[data-enable]').onclick=()=>this._toggle(AUTO);
     r.querySelector('[data-early]').onclick=()=>this._toggle('input_boolean.energetika_solar_early_start');
     r.querySelector('[data-pause]').onclick=()=>this._command('script','energetika_solar_pause',{},'Автоматика на паузе на час.');
@@ -79,21 +55,14 @@ class EnergetikaAutomationPanel extends HTMLElement {
     r.querySelector('[data-phone]').onchange=e=>e.target.dataset.dirty='true';
     r.querySelector('[data-phone-save]').onclick=async()=>{const phone=r.querySelector('[data-phone]');if(!phone.value)return;await this._command('input_text','set_value',{entity_id:'input_text.energetika_notification_target',value:phone.value},'Телефон для уведомлений сохранён.');delete phone.dataset.dirty;this._sync();};
     r.querySelectorAll('[data-field]').forEach(input=>input.addEventListener('input',()=>input.dataset.dirty='true'));
-    r.querySelector('[data-refresh]').onclick=()=>this._loadHistory();
   }
-  _selectTab(tab){this._tab=tab;const r=this.shadowRoot;r.querySelector('.body').scrollTop=0;r.querySelector('.weather').hidden=['forecast','dtek'].includes(tab);r.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===tab)));r.querySelectorAll('[data-section]').forEach(s=>s.hidden=s.dataset.section!==tab);if(tab==='history'&&(!this._fetched||Date.now()-this._fetched>300000))this._loadHistory();this._sync();}
   _sync(){
     if(!this._hass||!this.shadowRoot.firstChild)return;
-    const r=this.shadowRoot;const hourly=r.querySelector('energetika-hourly-charts');hourly.hass=this._hass;hourly.active=this._tab==='forecast'&&r.querySelector('dialog').open;
-    const dtek=r.querySelector('energetika-dtek-panel');dtek.hass=this._hass;dtek.active=this._tab==='dtek'&&r.querySelector('dialog').open;
+    const r=this.shadowRoot;
     const set=(sel,value)=>{r.querySelector(sel).textContent=value;},on=id=>this._state(id)==='on';
-    const c=this._attrs(WEATHER).current||{},fresh=on('binary_sensor.energetika_weather_fresh'),night=this._state('sun.sun')==='below_horizon';
-    const [symbol,description]=weather(num(c.weather_code),night),enabled=on(AUTO),fault=on('input_boolean.energetika_solar_fault');
+    const enabled=on(AUTO),fault=on('input_boolean.energetika_solar_fault');
     const until=this._attrs('input_datetime.energetika_solar_pause_until').timestamp||0,paused=until>Date.now()/1000;
-    set('[data-weather-icon]',symbol);set('[data-weather-text]',fresh?description:'Погода недоступна или устарела');
-    set('[data-temperature]',fmt(c.temperature_2m,1));
-    set('[data-weather-meta]',`Облачность ${fmt(c.cloud_cover)}% · ветер ${fmt(c.wind_speed_10m,1)} км/ч${c.time?' · '+new Date(c.time*1000).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}):''}`);
-    set('[data-brief]',`Одесса · ${fresh?description.toLowerCase():'ожидание погоды'} · PV ${fmt(this._state(P+'pv_power'))} Вт`);
+    set('[data-brief]','SBU / SUB · уведомления');
     set('[data-badge]',!enabled?'Вручную':fault?'Ошибка':paused?'Пауза':'Авто');
     set('[data-mode]',/\((\w+)\)$/.exec(this._state(MODE)||'')?.[1]||'—');
     set('[data-target]',this._state('sensor.energetika_solar_strategy')==='HOLD'?'Ожидание':this._state('sensor.energetika_solar_strategy')||'—');
@@ -104,7 +73,7 @@ class EnergetikaAutomationPanel extends HTMLElement {
     for(const [sel,id] of [['[data-enable]',AUTO],['[data-early]','input_boolean.energetika_solar_early_start']]){
       const b=r.querySelector(sel),active=on(id);b.setAttribute('aria-pressed',String(active));b.textContent=active?'Включено':'Выключено';b.disabled=this._busy||!configured||this._hass.connected===false||!this._hass.states[id];
     }
-    for(const [sel,id] of [['[data-pv]','sensor.energetika_pv_average'],['[data-baseline]','sensor.energetika_home_baseline'],['[data-coverage]','sensor.energetika_solar_coverage'],['[data-energy]','sensor.energetika_battery_percent_energy'],['[data-today-forecast]','sensor.energetika_solar_forecast'],['[data-next-hours]','sensor.energetika_solar_next_hours'],['[data-today-actual]',PV_DAY]])set(sel,fmt(this._state(id),sel.includes('today')?2:0));
+    for(const [sel,id] of [['[data-pv]','sensor.energetika_pv_average'],['[data-baseline]','sensor.energetika_home_baseline'],['[data-coverage]','sensor.energetika_solar_coverage'],['[data-energy]','sensor.energetika_battery_percent_energy']])set(sel,fmt(this._state(id),sel.includes('today')?2:0));
     for(const [key] of FIELDS){const input=r.querySelector(`[data-field="${key}"]`);if(!input.dataset.dirty&&r.activeElement!==input)input.value=num(this._state('input_number.energetika_solar_'+key))??'';input.disabled=!!this._busy||!configured;}
     r.querySelectorAll('[data-pause],[data-resume],[data-save]').forEach(b=>b.disabled=!!this._busy||!configured||this._hass.connected===false);
     set('[data-result]',['unknown','unavailable',undefined].includes(this._state('input_text.energetika_solar_result'))?'':this._state('input_text.energetika_solar_result'));
@@ -115,11 +84,6 @@ class EnergetikaAutomationPanel extends HTMLElement {
     const selected=devices.find(d=>d.entity===target);set('[data-phone-status]',selected?`Получатель: ${selected.name}`:'Получатель ещё не выбран. Сначала сохраните телефон.');
     r.querySelector('[data-phone-save]').disabled=!!this._busy||!this._hass.states['input_text.energetika_notification_target'];
     for(const [selector,id] of [['[data-notify-grid]','input_boolean.energetika_notify_grid'],['[data-notify-modes]','input_boolean.energetika_notify_modes']]){const b=r.querySelector(selector),enabled=on(id);b.setAttribute('aria-pressed',String(enabled));b.textContent=enabled?'Включено':'Выкл.';b.disabled=!!this._busy||!selected||!this._hass.states[id]||this._hass.connected===false;}
-    const days=this._attrs('sensor.energetika_solar_forecast').days;
-    const signature=JSON.stringify(days);
-    if(signature!==this._forecastSignature){this._forecastSignature=signature;const valid=Array.isArray(days)?days:[],max=Math.max(1,...valid.map(d=>num(d.kwh)||0));
-      r.querySelector('[data-forecast-days]').innerHTML=valid.length?valid.map(d=>{const [ic,text]=weather(num(d.code));return `<div class="day-card"><div class="day-weather"><span>${esc(ic)} ${esc(text)}</span><span>${fmt(d.min)}…${fmt(d.max)} °C</span></div><div class="chart-row"><span class="date">${esc(dayLabel(d.date))}</span><div class="track"><div class="fill" style="width:${Math.max(0,Math.min(100,(num(d.kwh)||0)/max*100))}%"></div></div><span class="amount">${fmt(d.kwh,2)} кВт·ч</span></div></div>`;}).join(''):'<p class="message">Прогноз появится после получения погоды.</p>';
-    }
   }
   async _command(domain,service,data,message){if(this._busy||!this._hass||this._hass.connected===false)return;this._busy=true;this._sync();const f=this.shadowRoot.querySelector('[data-feedback]');f.textContent='Сохранение…';try{await this._hass.callService(domain,service,data);f.textContent=message;}catch(error){f.textContent='Не удалось выполнить действие. '+String(error?.message||'Проверьте соединение.');}finally{this._busy=false;this._sync();}}
   async _toggle(id){return this._command('input_boolean',this._state(id)==='on'?'turn_off':'turn_on',{entity_id:id},'Настройка сохранена.');}
@@ -129,19 +93,6 @@ class EnergetikaAutomationPanel extends HTMLElement {
     this._busy=true;this._sync();const f=this.shadowRoot.querySelector('[data-feedback]');
     try{for(const [key,value] of values){await this._hass.callService('input_number','set_value',{entity_id:'input_number.energetika_solar_'+key,value});delete this.shadowRoot.querySelector(`[data-field="${key}"]`).dataset.dirty;}f.textContent='Условия сохранены. Применяются к следующим решениям автоматики.';}catch(error){f.textContent='Не все условия сохранены. '+String(error?.message||'Проверьте соединение.');}finally{this._busy=false;this._sync();}
   }
-  async _loadHistory(){
-    if(this._loadingHistory||!this._hass)return;this._loadingHistory=true;
-    const r=this.shadowRoot,message=r.querySelector('[data-history-message]');message.textContent='Загрузка солнечной истории…';
-    try{
-      // Server statistics use HA's local day boundaries and survive recorder purges.
-      const start=new Date(Date.now()-9*86400000).toISOString();
-      const response=await this._hass.callWS({type:'recorder/statistics_during_period',start_time:start,end_time:new Date().toISOString(),statistic_ids:[PV_DAY],period:'day',types:['change'],units:{energy:'kWh'}});
-      const byDay=new Map((response[PV_DAY]||[]).filter(row=>Number.isFinite(row.change)&&row.change>=0).map(row=>[dayKey(row.start),row.change]));
-      const today=dayKey(Date.now()),keys=[];for(let n=7;n>=1;n--)keys.push(dayKey(new Date(today+'T12:00:00Z').getTime()-n*86400000));
-      const max=Math.max(1,...keys.map(k=>byDay.get(k)||0));
-      r.querySelector('[data-history-days]').innerHTML=keys.map(key=>`<div class="chart-row actual"><span class="date">${esc(dayLabel(key))}</span><div class="track"><div class="fill" style="width:${Math.min(100,(byDay.get(key)||0)/max*100)}%"></div></div><span class="amount">${byDay.has(key)?fmt(byDay.get(key),2)+' кВт·ч':'—'}</span></div>`).join('');
-      message.textContent=keys.some(k=>!byDay.has(k))?'Для части дней ещё нет записей солнечного счётчика.':'';this._fetched=Date.now();
-    }catch(error){message.textContent='Не удалось загрузить солнечную историю. Нажмите «Обновить».';}finally{this._loadingHistory=false;}
-  }
+
 }
 if(!customElements.get('energetika-automation-panel'))customElements.define('energetika-automation-panel',EnergetikaAutomationPanel);

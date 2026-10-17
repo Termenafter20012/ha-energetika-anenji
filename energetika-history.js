@@ -216,5 +216,32 @@ class EnergetikaHistoryCard extends HTMLElement {
   }
 }
 if(!customElements.get('energetika-history-card'))customElements.define('energetika-history-card',EnergetikaHistoryCard);
+
+/* Use the same chart, palette and gestures when a flow tile opens its history. */
+class EnergetikaHistoryDialog extends HTMLElement {
+  constructor(){super();this.attachShadow({mode:'open'});}
+  connectedCallback(){
+    if(this.shadowRoot.firstChild)return;
+    this.shadowRoot.innerHTML=`<style>
+      :host{display:contents}*{box-sizing:border-box}dialog{width:min(1080px,calc(100vw - 20px));max-width:none;max-height:94dvh;margin:auto;padding:0;border:1px solid #35576e;border-radius:22px;color:#dbe9f5;background:#081522;box-shadow:0 24px 80px #0009;overflow:auto}dialog::backdrop{background:#030a12c9;backdrop-filter:blur(7px)}header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 17px 0;color:#87a8bc;font:11px system-ui,sans-serif;letter-spacing:1px}button{cursor:pointer;border:1px solid #335164;border-radius:10px;width:34px;height:34px;background:#102b3d;color:#b3d3df;font:25px system-ui,sans-serif}button:focus-visible{outline:2px solid #6cd8ef;outline-offset:2px}.content{padding:0 7px 6px}energetika-history-card{display:block}@media(max-height:500px){dialog{max-height:98dvh}header{padding-top:5px}}
+    </style><dialog aria-label="История показателя"><header><span>ЭНЕРГЕТИКА / ИСТОРИЯ</span><button aria-label="Закрыть график">×</button></header><div class="content"></div></dialog>`;
+    const dialog=this.shadowRoot.querySelector('dialog');
+    this.shadowRoot.querySelector('button').onclick=()=>dialog.close();
+    dialog.addEventListener('close',()=>{this.shadowRoot.querySelector('.content').replaceChildren();this._chart=null;if(this._opener?.isConnected)this._opener.focus();});
+    dialog.addEventListener('click',e=>{if(e.target===dialog){const b=dialog.getBoundingClientRect();if(e.clientX<b.left||e.clientX>b.right||e.clientY<b.top||e.clientY>b.bottom)dialog.close();}});
+  }
+  set hass(value){if(this._chart)this._chart.hass=value;}
+  open(hass,config,opener){
+    if(!this.shadowRoot.firstChild)this.connectedCallback();
+    this._opener=opener;
+    const chart=document.createElement('energetika-history-card');
+    chart.setConfig({...config,date_selector:false});chart.hass=hass;this._chart=chart;
+    const dialog=this.shadowRoot.querySelector('dialog');dialog.setAttribute('aria-label',config.title);
+    this.shadowRoot.querySelector('.content').replaceChildren(chart);
+    if(!dialog.open)dialog.showModal();
+  }
+  disconnectedCallback(){this.shadowRoot.querySelector('.content')?.replaceChildren();this._chart=null;}
+}
+if(!customElements.get('energetika-history-dialog'))customElements.define('energetika-history-dialog',EnergetikaHistoryDialog);
 window.customCards=window.customCards||[];
 window.customCards.push({type:'energetika-history-card',name:'Энергетика · История',description:'Графики потоков с масштабированием и фильтрацией телеметрии',preview:false});
