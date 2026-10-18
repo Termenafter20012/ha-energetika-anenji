@@ -35,7 +35,7 @@ homeassistant:
 
 Не створюйте другу секцію `homeassistant`. Якщо пакети вже підключені каталогом, скористайтеся наявною схемою.
 
-Скопіюйте **дев’ять** файлів `energetika-card.js`, `energetika-history.js`, `energetika-date.js`, `energetika-settings.js`, `energetika-automation.js`, `energetika-data.js`, `energetika-alerts.js`, `energetika-hourly.js` та `energetika-dtek.js` до `www`. Створіть у `www` також копію `energetika-card.js` з назвою `energetika-card-2.13.1.js` для головного ресурсу. Головна картка імпортує історію та налаштування відносними шляхами. У Налаштування → Інформаційні панелі → Ресурси додайте `/local/energetika-card-2.13.1.js`, тип **Модуль JavaScript**. Додаткові ресурси для імпортованих модулів не потрібні.
+Скопіюйте **дев’ять** файлів `energetika-card.js`, `energetika-history.js`, `energetika-date.js`, `energetika-settings.js`, `energetika-automation.js`, `energetika-data.js`, `energetika-alerts.js`, `energetika-hourly.js` та `energetika-dtek.js` до `www`. Створіть у `www` також копію `energetika-card.js` з назвою `energetika-card-2.13.2.js` для головного ресурсу. Головна картка імпортує історію та налаштування відносними шляхами. У Налаштування → Інформаційні панелі → Ресурси додайте `/local/energetika-card-2.13.2.js`, тип **Модуль JavaScript**. Додаткові ресурси для імпортованих модулів не потрібні.
 
 При першому створенні `www` може знадобитися перезапуск. Перевірте конфігурацію через інструменти YAML перед перезапуском.
 
@@ -274,3 +274,18 @@ REST-запит тепер також отримує погодинні `tempera
 Оновлення з 2.13.0: замініть `energetika-automation.js`, `energetika-card.js` і копію головного модуля `energetika-card-2.13.1.js`; у сценарії `script.energetika_solar_resume` пакета `energetika.yaml` після очищення паузи додайте дію `input_boolean.turn_on` для `input_boolean.energetika_solar_auto`. Перезавантажте сценарії через YAML-інструменти HA, замініть ресурс на `/local/energetika-card-2.13.1.js` і оновіть застосунок. Повний перезапуск HA не потрібен. Поточні пороги, телефон і стан інвертора при встановленні не скидаються. Резервна копія попередньої конфігурації дає змогу відкотити зміну.
 
 [Таймери в реальному Home Assistant](screenshots/automation-countdowns.jpg) · [Таймери на телефоні](screenshots/mobile-automation-countdowns.jpg).
+
+
+## Логічна сітка плиток · 2.13.2
+
+Головні потоки мають постійний порядок у три стовпці:
+
+- Верхній ряд: **навантаження загалом; сонце → АКБ; сонце → навантаження**.
+- Середній ряд: **мережа загалом; мережа → АКБ; мережа → навантаження**.
+- Нижній ряд: **напруга АКБ; заряд АКБ загалом; АКБ → навантаження**.
+
+На широкому екрані сітка теж має три стовпці. Плитка заряджання більше не займає окремий широкий ряд. Обидва види візуалізації використовують спільний порядок і ті самі обробники відкриття графіків.
+
+Для оновлення замініть `energetika-card.js`, створіть поруч його копію `energetika-card-2.13.2.js` та змініть головний ресурс на `/local/energetika-card-2.13.2.js`. Перезавантажте екран застосунку. Перезапуск Home Assistant і зміна YAML для цієї компоновки не потрібні.
+
+[Сітка на телефоні](screenshots/logical-flow-grid-mobile.jpg) · [Сітка на комп’ютері](screenshots/logical-flow-grid-desktop.jpg).
