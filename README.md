@@ -95,13 +95,17 @@ Home Assistant 2026.10, EyeBond Local **0.1.53**, драйвер `modbus_smg`, �
 
 На кожному графіку є календар і стрілки з кроком 6 / 12 / 24 години, включно з графіками, відкритими з плиток. Погода та ДТЕК перемикаються по добах. У ДТЕК окремо показані факт мережі та збережений план із поділом на години. Локальний серверний архів накопичується до 90 днів; незбережені давні плани не вигадуються. Деталі джерел та оновлення з одним перезапуском HA — у [інструкції](docs/INSTALL.uk.md#календар-стрілки-та-архів--2130).
 
+## Таймери автоматики · 2.13.1
+
+В «Автоматизации» видно залишок ручної паузи та мінімального інтервалу між змінами режиму. Відлік оновлюється щосекунди за серверними строками. «Включить авто» зберігає паузу, а **«Возобновить сейчас»** знімає ручну паузу та вмикає автоматичне керування; раніше ця кнопка не вмикала його, якщо перемикач був вимкнений. Звичайний інтервал у 10 хвилин зберігається. [Інструкція](docs/INSTALL.uk.md#таймери-та-відновлення-автоматики--2131) · [Знімок екрана](docs/screenshots/automation-countdowns.jpg).
+
 ## Ручне встановлення
 
-Для версії 2.13.0 після копіювання JS створіть у `www` також копію `energetika-card.js` з назвою **`energetika-card-2.13.0.js`**. Саме цю копію підключіть як ресурс. Офлайн-встановлювач створює її автоматично. Ім’я з версією допомагає уникнути старої копії картки у кеші під час оновлення.
+Для версії 2.13.1 після копіювання JS створіть у `www` також копію `energetika-card.js` з назвою **`energetika-card-2.13.1.js`**. Саме цю копію підключіть як ресурс. Офлайн-встановлювач створює її автоматично. Ім’я з версією допомагає уникнути старої копії картки у кеші під час оновлення.
 
 Повні кроки, відповідність сутностей, оновлення і відкат — у **[docs/INSTALL.uk.md](docs/INSTALL.uk.md)**.
 
-Скопіюйте `custom_components/energetika_dtek` до `custom_components` HA, `energetika.yaml` до каталогу конфігурації HA, дев’ять JS-файлів (`energetika-card.js`, `energetika-history.js`, `energetika-date.js`, `energetika-settings.js`, `energetika-automation.js`, `energetika-data.js`, `energetika-alerts.js`, `energetika-hourly.js`, `energetika-dtek.js`) — до `www`. Додайте пакет у `homeassistant.packages`, перевірте конфігурацію та перезапустіть HA. Додайте ресурс `/local/energetika-card-2.13.0.js` типу JavaScript module і вставте `dashboard-energetika.yaml` у текстовий редактор окремої панелі. Не замінюйте власний `configuration.yaml` цілком.
+Скопіюйте `custom_components/energetika_dtek` до `custom_components` HA, `energetika.yaml` до каталогу конфігурації HA, дев’ять JS-файлів (`energetika-card.js`, `energetika-history.js`, `energetika-date.js`, `energetika-settings.js`, `energetika-automation.js`, `energetika-data.js`, `energetika-alerts.js`, `energetika-hourly.js`, `energetika-dtek.js`) — до `www`. Додайте пакет у `homeassistant.packages`, перевірте конфігурацію та перезапустіть HA. Додайте ресурс `/local/energetika-card-2.13.1.js` типу JavaScript module і вставте `dashboard-energetika.yaml` у текстовий редактор окремої панелі. Не замінюйте власний `configuration.yaml` цілком.
 
 Для сумісного драйвера використайте `patches/install_guard.py`. Самостійний офлайн-інсталятор цієї конкретної конфігурації збирається командою `python build_deploy.py` у `.deploy/install_energetika_v2.py`. Перед застосуванням на іншому обладнанні адаптуйте всі сутності, ємність і межі.
 

@@ -809,6 +809,9 @@ script:
           entity_id: input_text.energetika_solar_result
         data:
           value: "Ожидание устойчивых условий."
+      - action: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.energetika_solar_auto
 
 automation:
   - id: energetika_weather_recovery
