@@ -35,7 +35,7 @@ homeassistant:
 
 Не створюйте другу секцію `homeassistant`. Якщо пакети вже підключені каталогом, скористайтеся наявною схемою.
 
-Скопіюйте **дев’ять** файлів `energetika-card.js`, `energetika-history.js`, `energetika-date.js`, `energetika-settings.js`, `energetika-automation.js`, `energetika-data.js`, `energetika-alerts.js`, `energetika-hourly.js` та `energetika-dtek.js` до `www`. Створіть у `www` також копію `energetika-card.js` з назвою `energetika-card-2.14.0.js` для головного ресурсу. Головна картка імпортує історію та налаштування відносними шляхами. У Налаштування → Інформаційні панелі → Ресурси додайте `/local/energetika-card-2.14.0.js`, тип **Модуль JavaScript**. Додаткові ресурси для імпортованих модулів не потрібні.
+Скопіюйте **десять** файлів `energetika-card.js`, `energetika-history.js`, `energetika-date.js`, `energetika-settings.js`, `energetika-manual.js`, `energetika-automation.js`, `energetika-data.js`, `energetika-alerts.js`, `energetika-hourly.js` та `energetika-dtek.js` до `www`. Створіть у `www` також копію `energetika-card.js` з назвою `energetika-card-2.15.0.js` для головного ресурсу. Головна картка імпортує історію та налаштування відносними шляхами. У Налаштування → Інформаційні панелі → Ресурси додайте `/local/energetika-card-2.15.0.js`, тип **Модуль JavaScript**. Додаткові ресурси для імпортованих модулів не потрібні.
 
 При першому створенні `www` може знадобитися перезапуск. Перевірте конфігурацію через інструменти YAML перед перезапуском.
 
@@ -314,3 +314,10 @@ REST-запит тепер також отримує погодинні `tempera
 Замініть `energetika.yaml`, `energetika-card.js`, `energetika-automation.js` і `energetika-history.js`, зберігши свої зміни конфігурації. Створіть копію головного JS `www/energetika-card-2.14.0.js` і змініть ресурс на `/local/energetika-card-2.14.0.js`. Перезавантажте шаблони (`template.reload`) та допоміжні числа (`input_number.reload`) через інструментарій HA. Встановіть бажане покриття, наприклад 50%, у меню автоматизацій. Оновіть екран застосунку. Повний перезапуск HA не потрібен; встановлення файлів саме по собі не надсилає команд режиму інвертора. Якщо автоматика увімкнена, нові пороги застосовуються до її наступних рішень.
 
 [Поріг 50%](screenshots/automation-coverage-50.jpg) · [Історія режимів та порогів](screenshots/automation-mode-history.jpg).
+
+
+## Нумерація та повний каталог LCD · 2.15.0
+
+До `www` додано новий файл `energetika-manual.js`. Разом з ним оновіть `energetika-settings.js`, `energetika-card.js` та копію `energetika-card-2.15.0.js`. Змініть головний ресурс на `/local/energetika-card-2.15.0.js` і перезавантажте екран застосунку. YAML, перезапуск HA і зміни параметрів інвертора для цього оновлення не потрібні. Офлайн-встановлювач уже містить десять модулів.
+
+Каталог відтворює номери всіх 35 пунктів на семи наданих аркушах. Номери пунктів не є адресами регістрів Modbus. Поля дистанційного керування прив’язуються тільки до наявних об’єктів number/select/switch інтеграції; для решти видно «Настройка на LCD» і довідку. Жодних довільних Modbus-команд за номером пункту немає. Докладний перелік і обмеження наведено в [описі меню](INVERTER-MENU.uk.md).
