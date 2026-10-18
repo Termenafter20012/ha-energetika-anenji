@@ -9,7 +9,7 @@ export function formatRuntime(minutes) {
   const total=Math.floor(minutes);
   return total===0?'0 мин':`${Math.floor(total/60)} ч ${String(total%60).padStart(2,'0')} мин`;
 }
-/* Energetika 2.13.2 — local Home Assistant card, no external dependencies. */
+/* Energetika 2.13.3 — local Home Assistant card, no external dependencies. */
 const ROOT = 'sensor.anenji_4200_protocol_1_';
 const SOURCE_MODES = [
   {code:'UTI', option:'Utility First (UTI)', description:'Сеть в приоритете'},
@@ -250,14 +250,14 @@ class EnergetikaCard extends HTMLElement {
     <section class="flow-panel"><div class="section-label">ПОТОКИ МОЩНОСТИ <span style="color:#3f5e76">/ НАЖМИТЕ НА ЧИСЛО ДЛЯ ИСТОРИИ</span></div>
     <div class="tiles">
       ${this._tile('load','Нагрузка · всего','Потребление дома','home','home')}
-      ${this._tile('pv_battery','Солнце → АКБ','Заряд от солнечных панелей','sun','solar')}
       ${this._tile('pv_load','Солнце → нагрузка','Солнечная энергия для дома','sun','solar')}
+      ${this._tile('pv_battery','Солнце → АКБ','Заряд от солнечных панелей','sun','solar')}
       ${this._tile('grid','Сеть · всего','Общий забор из сети','grid','grid')}
-      ${this._tile('grid_battery','Сеть → АКБ','Заряд от электросети','up','grid')}
       ${this._tile('grid_load','Сеть → нагрузка','Питание через байпас','grid','grid')}
+      ${this._tile('grid_battery','Сеть → АКБ','Заряд от электросети','up','grid')}
       <button class="tile battery" data-key="voltage" title="История напряжения аккумулятора">${icon('battery')}<span class="tile-body"><span class="tile-title">Напряжение АКБ</span><strong>${value('voltage','В')}</strong></span></button>
-      ${this._tile('charge','Заряд АКБ · всего','Сеть + солнце','up','battery')}
       ${this._tile('battery_load','АКБ → нагрузка','Разряд аккумулятора в дом','down','battery')}
+      ${this._tile('charge','Заряд АКБ · всего','Сеть + солнце','up','battery')}
     </div></section>
       <div class="tile battery battery-summary">
         <div class="battery-top"><div class="battery-title">${icon('battery')}АКБ <span class="nameplate" data-battery-nameplate>2560 Вт·ч</span></div><div class="mode-switch" role="group" aria-label="Способ оценки заряда"><button data-mode="energy" aria-pressed="true">Энергия</button><button data-mode="voltage" aria-pressed="false">По напряжению</button></div></div>
