@@ -96,7 +96,8 @@ class EnergetikaHistoryCard extends HTMLElement {
       .legend{display:grid;grid-template-columns:repeat(var(--series-count),minmax(0,1fr));gap:7px;margin-top:8px}.legend button{display:grid;grid-template-columns:7px 1fr;align-items:center;gap:4px 6px;text-align:left;background:#10213277;border:1px solid #20394b;border-radius:10px;padding:8px;min-width:0}.swatch{width:6px;height:6px;border-radius:50%;background:var(--tone);box-shadow:0 0 8px color-mix(in srgb,var(--tone) 40%,transparent)}.legend .name{color:#a6bed0;font-size:10px;white-space:nowrap}.legend strong{grid-column:2;font-size:14px;font-weight:650;white-space:nowrap;font-variant-numeric:tabular-nums}.legend button.off{opacity:.35}.unit{font-size:9px;font-weight:400;color:#8ca4b8;margin-left:2px}.footer{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;font-size:10px;color:#6b8a9f}.zoom{display:flex;align-items:center;gap:4px}.zoom button{padding:3px 9px;font-size:15px;min-height:28px}.zoom .fit{font-size:10px}.zoom button:disabled{opacity:.35;cursor:default}.zoom-label{font-variant-numeric:tabular-nums;color:#7dc7e0;font-size:10px;margin-left:3px}.tooltip{display:none;position:absolute;pointer-events:none;z-index:2;top:25px;max-width:230px;background:#07111df2;border:1px solid #325169;border-radius:12px;padding:11px;box-shadow:0 5px 24px #0005;font-size:11px;color:#bdd0de}.tooltip strong{color:#f1f8ff}.tooltip .row{display:flex;justify-content:space-between;gap:15px;margin-top:6px}.tip-time{color:#87a4bb;font-size:10px;margin-bottom:9px}.empty{fill:#7897ad;font-size:12px;text-anchor:middle}
       @media(max-width:600px){ha-card{padding:14px 10px;border-radius:20px}h2{font-size:15px}.eyebrow{font-size:8px;margin-bottom:5px}.controls{gap:4px}.controls button,input{font-size:10px;padding:6px 8px}.chart svg{height:280px}.legend{gap:4px;margin-top:3px}.legend button{padding:7px 3px;gap:4px 3px;grid-template-columns:5px 1fr;border-radius:8px}.swatch{width:5px;height:5px}.legend .name{font-size:9px}.legend strong{font-size:12px;grid-column:1/-1;text-align:center}.unit{font-size:8px}.footer{font-size:9px;flex-wrap:wrap}.zoom-label{font-size:9px}.gesture-hint{flex:1;white-space:nowrap}}
       @media(max-width:360px){.legend .name{font-size:8px}.legend strong{font-size:11px}.legend button{gap:3px 2px}.chart svg{height:265px}}
-    </style><ha-card><header><div><div class="eyebrow">ЭНЕРГЕТИКА / ИСТОРИЯ</div><h2>${escapeHtml(this.config.title||'История энергии')}</h2></div><div class="controls"><button data-range="6">6 ч</button><button data-range="12">12 ч</button><button data-range="24" class="selected">24 ч</button><button data-step="-1" aria-label="Предыдущий период">‹</button><energetika-date-picker></energetika-date-picker><button data-step="1" aria-label="Следующий период">›</button><button data-now hidden title="К текущему времени">Сейчас</button><button data-refresh title="Обновить историю">↻</button></div></header><p class="period" data-period></p><div class="status" role="status"></div><div class="chart"><svg role="img" tabindex="0" aria-label="${escapeHtml(this.config.title||'График')}. Два пальца — масштаб, один — сдвиг. Клавиши плюс, минус, стрелки, Home."></svg><div class="tooltip"></div></div><div class="legend" style="--series-count:${this._entities.length}"></div><div class="footer"><span class="gesture-hint">Два пальца — масштаб · один — сдвиг</span><div class="zoom"><button data-zoom="in" aria-label="Увеличить график">+</button><button data-zoom="out" aria-label="Уменьшить график">−</button><button class="fit" data-fit title="Показать весь выбранный период">Весь период</button><span class="zoom-label"></span></div></div></ha-card>`;
+      .history-tracks{margin-top:12px}.history-track{margin:12px 0}.track-title{font-size:11px;color:#a6c6d6;line-height:1.6}.track-title .key{white-space:nowrap;display:inline-block;margin-right:8px;font-size:10px}.history-track svg{width:100%;display:block;height:66px;touch-action:pan-y}.history-track.state svg{height:42px}.track-readout{font-size:11px;color:#d7e8f4;line-height:1.8;background:#102739;border:1px solid #2f5268;border-radius:9px;padding:9px}.track-threshold{fill:none;stroke-width:1.2;stroke-dasharray:5 4}.track-axis{font-size:9px;fill:#88a8be}.track-line{fill:none;stroke-width:1.7;vector-effect:non-scaling-stroke}
+    </style><ha-card><header><div><div class="eyebrow">ЭНЕРГЕТИКА / ИСТОРИЯ</div><h2>${escapeHtml(this.config.title||'История энергии')}</h2></div><div class="controls"><button data-range="6">6 ч</button><button data-range="12">12 ч</button><button data-range="24" class="selected">24 ч</button><button data-step="-1" aria-label="Предыдущий период">‹</button><energetika-date-picker></energetika-date-picker><button data-step="1" aria-label="Следующий период">›</button><button data-now hidden title="К текущему времени">Сейчас</button><button data-refresh title="Обновить историю">↻</button></div></header><p class="period" data-period></p><div class="status" role="status"></div><div class="chart"><svg role="img" tabindex="0" aria-label="${escapeHtml(this.config.title||'График')}. Два пальца — масштаб, один — сдвиг. Клавиши плюс, минус, стрелки, Home."></svg><div class="tooltip"></div></div><div class="history-tracks"></div><p class="track-readout" role="status" hidden></p><div class="legend" style="--series-count:${this._entities.length}"></div><div class="footer"><span class="gesture-hint">Два пальца — масштаб · один — сдвиг</span><div class="zoom"><button data-zoom="in" aria-label="Увеличить график">+</button><button data-zoom="out" aria-label="Уменьшить график">−</button><button class="fit" data-fit title="Показать весь выбранный период">Весь период</button><span class="zoom-label"></span></div></div></ha-card>`;
     this.shadowRoot.querySelectorAll('[data-range]').forEach(button=>button.addEventListener('click',()=>{this._range=button.dataset.range;this._view=null;this._request++;this._load();}));
     this.shadowRoot.querySelectorAll('[data-step]').forEach(button=>button.onclick=()=>this._navigate(Number(button.dataset.step)));
     this.shadowRoot.querySelector('energetika-date-picker').addEventListener('change',event=>{this._anchor=dayStart(event.detail.value);this._view=null;this._request++;this._load();});
@@ -127,13 +128,18 @@ class EnergetikaHistoryCard extends HTMLElement {
     const status=this.shadowRoot.querySelector('.status');status.classList.remove('visible');
     this._syncControls();
     try{
-      const ids=this._entities.map(s=>s.entity).join(',');
+      const tracks=this.config.tracks||[];const ids=[...new Set([...this._entities.map(s=>s.entity),...tracks.flatMap(t=>[t.entity,...(t.thresholds||[]).map(q=>q.entity)]).filter(Boolean)])].join(',');
       const response=await this._hass.callApi('GET',`history/period/${new Date(start).toISOString()}?filter_entity_id=${encodeURIComponent(ids)}&end_time=${encodeURIComponent(new Date(end).toISOString())}&minimal_response&no_attributes`);
       if(request!==this._request)return;
       this._start=start;this._end=end;
       if(this._view)this._view=clampWindow(this._view.start,this._view.end-this._view.start,start,end);
       const byId=new Map(response.filter(rows=>rows.length).map(rows=>[rows[0].entity_id,rows]));
       this._series=this._entities.map((entity,index)=>({...entity,color:entity.color||['#ffd65a','#bc7bff','#38bfff','#17e6b3','#70a7ff'][index%5],...cleanHistory(byId.get(entity.entity)||[],entity.minimum??0,entity.maximum??11000,start,end)}));
+      this._tracks=tracks.map(track=>{
+        const points=track.kind?(byId.get(track.entity)||[]).map(row=>({t:Math.max(start,Date.parse(row.last_changed||row.last_updated)),v:['unknown','unavailable','',null].includes(row.state)?null:row.state})).filter(p=>Number.isFinite(p.t)&&p.t<=end).sort((a,b)=>a.t-b.t).reduce((out,p)=>{if(!out.length||out.at(-1).v!==p.v)out.push(p);return out;},[]):cleanHistory(byId.get(track.entity)||[],0,track.maximum??100,start,end).points;
+        const thresholds=(track.thresholds||[]).map(q=>({...q,points:q.entity?cleanHistory(byId.get(q.entity)||[],0,100,start,end).points.map(p=>({...p,v:p.v===null?null:p.v+(q.offset||0)})):[{t:start,v:q.value}]}));
+        return {...track,points,thresholds};
+      });
       this._draw();
     }catch(error){if(request===this._request){status.textContent='Не удалось загрузить историю. Нажмите ↻ для повтора.';status.classList.add('visible');}}
     finally{this._loading=false;if(this._pending&&this.isConnected){this._pending=false;this._load();}}
@@ -191,7 +197,7 @@ class EnergetikaHistoryCard extends HTMLElement {
       markup+=`<line class="gridline" x1="${x}" x2="${x}" y1="${top}" y2="${bottom}"/><text class="axis" x="${x}" y="${height-7}" text-anchor="${index===0?'start':index===ticks?'end':'middle'}">${clock(time)}</text>`;
     }
     markup+=`<text class="axis" x="${left}" y="14">${escapeHtml(this.config.unit||'Вт')}</text>`;
-    for(const series of active)markup+=`<path class="series-line" stroke="${escapeHtml(series.color)}" d="${buildStepPath(series.points,start,end,minimum,maximum,geometry)}"/>`;
+    for(const series of active)markup+=`<path class="series-line" stroke="${escapeHtml(series.color)}" ${series.dash?'stroke-dasharray="5 4"':''} d="${buildStepPath(series.points,start,end,minimum,maximum,geometry)}"/>`;
     if(!values.length)markup+=`<text class="empty" x="${(left+right)/2}" y="${height/2}">Нет данных</text>`;
     markup+=`<line class="cross" y1="${top}" y2="${bottom}" visibility="hidden"/>`;
     svg.innerHTML=markup;
@@ -199,6 +205,7 @@ class EnergetikaHistoryCard extends HTMLElement {
     this.shadowRoot.querySelector('[data-fit]').disabled=!this._isZoomed();
     this.shadowRoot.querySelector('[data-zoom="out"]').disabled=!this._isZoomed();
     this.shadowRoot.querySelector('[data-zoom="in"]').disabled=end-start<=Math.min(60000,this._end-this._start);
+    this._drawTracks();
     if(!redrawLegend)return;
     this.shadowRoot.querySelector('.legend').innerHTML=this._series.map((series,index)=>{
       const last=series.points.at(-1)?.v,name=series.name.replace('Зарядка АКБ','Заряд').replace('Разрядка АКБ','Разряд');
@@ -210,6 +217,38 @@ class EnergetikaHistoryCard extends HTMLElement {
       button.addEventListener('dblclick',()=>this.dispatchEvent(new CustomEvent('hass-more-info',{detail:{entityId:series.entity},bubbles:true,composed:true})));
     });
   }
+  _trackState(track,value){
+    if(value===null)return {label:'Нет данных',color:'#314354'};
+    if(track.kind==='boolean')return value==='on'?{label:track.onLabel||'Да',color:track.onColor||'#258b74'}:{label:track.offLabel||'Нет',color:'#3e5062'};
+    const code=String(value).match(/\(([^)]+)\)/)?.[1]||String(value);
+    return {label:code,color:({SBU:'#159b7c',SUB:'#237ca8',SOL:'#b5932c',SUF:'#9d78ca',UTI:'#6f85b5'})[code]||'#657a8d'};
+  }
+  _pointValue(points,time){let value=null;for(const point of points){if(point.t>time)break;value=point.v;}return value;}
+  _trackText(time){
+    return (this._tracks||[]).map(t=>`${t.name}: ${t.kind?this._trackState(t,this._pointValue(t.points,time)).label:(this._pointValue(t.points,time)===null?'—':fmt(this._pointValue(t.points,time))+'%')}${t.kind?'':t.thresholds.map(q=>' · '+q.name+': '+(this._pointValue(q.points,time)===null?'—':fmt(this._pointValue(q.points,time))+'%')).join('')}`).join(' | ');
+  }
+  _drawTracks(){
+    const container=this.shadowRoot.querySelector('.history-tracks'),tracks=this._tracks||[];if(!tracks.length){container.innerHTML='';return;}
+    const {start,end}=this._visibleWindow(),width=Math.max(260,this.shadowRoot.querySelector('.chart svg').clientWidth),left=this._geometry.left,right=this._geometry.right,x=t=>left+(t-start)/(end-start)*(right-left);
+    container.innerHTML=tracks.map(track=>{
+      const points=visiblePoints(track.points,start,end);let body='',key='';
+      if(track.kind){
+        const modes=track.kind==='mode'?['SBU','SUB']:['on','off'];
+        key=modes.map(v=>{const s=this._trackState(track,v);return `<span class="key" style="color:${s.color}">● ${escapeHtml(s.label)}</span>`;}).join('');
+        body=`<rect x="${left}" y="2" width="${right-left}" height="22" rx="4" fill="#152737"/>`;
+        for(let i=0;i<points.length;i++){const p=points[i],to=points[i+1]?.t??end,state=this._trackState(track,p.v),span=x(to)-x(p.t);body+=`<rect x="${x(p.t)}" y="2" width="${Math.max(0,span)}" height="22" fill="${state.color}"><title>${escapeHtml(state.label)} · ${clock(p.t)}–${clock(to)}</title></rect>`;if(span>42)body+=`<text x="${x(p.t)+span/2}" y="17" text-anchor="middle" fill="#eef9ff" font-size="10">${escapeHtml(state.label)}</text>`;}
+      }else{
+        const values=points.map(p=>p.v).filter(v=>v!==null),maximum=Math.max(100,...values),g={left,right,top:3,bottom:45};
+        body=`<text class="track-axis" x="${left-5}" y="10" text-anchor="end">${fmt(maximum)}</text><text class="track-axis" x="${left-5}" y="46" text-anchor="end">0%</text>`;
+        for(const q of track.thresholds){body+=`<path class="track-threshold" stroke="${q.color}" d="${buildStepPath(q.points,start,end,0,maximum,g)}"/>`;key+=`<span class="key" style="color:${q.color}">┄ ${escapeHtml(q.name)}</span>`;}
+        body+=`<path class="track-line" stroke="${track.color}" d="${buildStepPath(track.points,start,end,0,maximum,g)}"/>`;
+      }
+      const height=track.kind?42:66;
+      for(let i=0;i<=4;i++){const time=start+(end-start)*i/4;body+=`<text class="track-axis" x="${x(time)}" y="${height-2}" text-anchor="${i===0?'start':i===4?'end':'middle'}">${clock(time)}</text>`;}
+      return `<div class="history-track ${track.kind?'state':''}"><div class="track-title">${escapeHtml(track.name)} · ${key}</div><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(track.name)}">${body}</svg></div>`;
+    }).join('');
+    container.querySelectorAll('svg').forEach(svg=>{const show=event=>{const box=svg.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,((event.clientX-box.left)/box.width*width-left)/(right-left))),time=start+(end-start)*fraction,readout=this.shadowRoot.querySelector('.track-readout');readout.hidden=false;readout.textContent=new Date(time).toLocaleString('ru-RU')+' · '+this._trackText(time);};svg.onpointermove=show;svg.onclick=show;});
+  }
   _hideHover(){this.shadowRoot.querySelector('.tooltip').style.display='none';this.shadowRoot.querySelector('.cross')?.setAttribute('visibility','hidden');}
   _hover(event){
     if(!this._start||!this._geometry)return;
@@ -220,7 +259,7 @@ class EnergetikaHistoryCard extends HTMLElement {
       const value=index<0?null:series.points[index].v;
       return `<div class="row"><span style="color:${escapeHtml(series.color)}">${escapeHtml(series.name)}</span><strong>${value===null?'—':fmt(value)} ${escapeHtml(this.config.unit||'Вт')}</strong></div>`;
     }).join('');
-    const tooltip=this.shadowRoot.querySelector('.tooltip');tooltip.innerHTML=`<div class="tip-time">${new Date(time).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>${rows}`;tooltip.style.display='block';tooltip.style.left=fraction>.5?'50px':'auto';tooltip.style.right=fraction>.5?'auto':'10px';
+    const tooltip=this.shadowRoot.querySelector('.tooltip');tooltip.innerHTML=`<div class="tip-time">${new Date(time).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>${rows}${this._tracks?.length?'<div class="row">'+escapeHtml(this._trackText(time))+'</div>':''}`;tooltip.style.display='block';tooltip.style.left=fraction>.5?'50px':'auto';tooltip.style.right=fraction>.5?'auto':'10px';
     const cross=this.shadowRoot.querySelector('.cross');cross.setAttribute('x1',relative);cross.setAttribute('x2',relative);cross.setAttribute('visibility','visible');
   }
 }

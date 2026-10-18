@@ -1,3 +1,4 @@
+import './energetika-history.js?v=2.14.0.1';
 /* Home Assistant owns all deadlines and switching. The UI only displays their countdown. */
 const P='sensor.anenji_4200_protocol_1_';
 const AUTO='input_boolean.energetika_solar_auto';
@@ -8,7 +9,7 @@ const fmt=(v,d=0)=>num(v)===null?'—':Number(v).toLocaleString('ru-RU',{maximum
 const countdown=seconds=>{const total=Math.max(0,Math.ceil(seconds)),hours=Math.floor(total/3600),minutes=Math.floor(total/60)%60,rest=total%60;return (hours?String(hours).padStart(2,'0')+':':'')+String(minutes).padStart(2,'0')+':'+String(rest).padStart(2,'0');};
 const FIELDS=[
   ['start_watts','Порог солнца','Вт',300,1500,50,'SBU разрешён при этой средней мощности либо при достаточном покрытии фоновой нагрузки.'],
-  ['coverage_target','Покрытие фона','%',70,100,5,'Доля фоновой нагрузки 400–700 Вт, которую должно покрывать солнце. Обычно 85%.'],
+  ['coverage_target','Покрытие фона','%',50,100,5,'Доля фоновой нагрузки 400–700 Вт для входа в SBU. От 50%; возврат — на 15 процентных пунктов ниже, с задержкой 10 минут.'],
   ['entry_reserve','Заряд для входа в SBU','%',30,80,5,'Минимальный остаток по энергии для входа в SBU. При 25% автоматика возвращает SUB.'],
 ];
 
@@ -16,8 +17,8 @@ class EnergetikaAutomationPanel extends HTMLElement {
   constructor(){super();this.attachShadow({mode:'open'});}
   connectedCallback(){if(!this.shadowRoot.firstChild)this._render();clearInterval(this._timer);this._timer=setInterval(()=>this._sync(),1000);}
   disconnectedCallback(){clearInterval(this._timer);}
-  set hass(value){this._hass=value;if(!this.shadowRoot.firstChild)this._render();this._sync();}
-  open(){if(!this.shadowRoot.firstChild)this._render();const dialog=this.shadowRoot.querySelector('dialog');if(!dialog.open)dialog.showModal();this._sync();}
+  set hass(value){this._hass=value;if(!this.shadowRoot.firstChild)this._render();this._sync();if(this.shadowRoot.querySelector('dialog').open)this._history.hass=value;}
+  open(){if(!this.shadowRoot.firstChild)this._render();const dialog=this.shadowRoot.querySelector('dialog');if(!dialog.open)dialog.showModal();this._sync();if(this._hass)this._history.hass=this._hass;}
   _state(id){return this._hass?.states[id]?.state;}
   _attrs(id){return this._hass?.states[id]?.attributes||{};}
   _render(){
@@ -37,11 +38,31 @@ class EnergetikaAutomationPanel extends HTMLElement {
       <div class="box"><div class="switch-row"><div><h3>Солнечный SBU / SUB</h3><p>Работает в Home Assistant, даже когда панель закрыта.</p></div><button class="toggle" data-enable aria-pressed="false">Выключено</button></div><div class="state-line"><span>Инвертор: <b data-mode>—</b></span><span>Решение: <b data-target>—</b></span></div><p class="reason" data-reason></p><div class="status" data-status role="status"></div><div class="countdowns" aria-label="Ограничения смены режима"><div><span>Пауза после ручного выбора</span><strong data-pause-left role="timer" aria-live="off">—</strong></div><div><span>Интервал между режимами</span><strong data-interval-left role="timer" aria-live="off">—</strong></div></div><p class="timing-note" data-timing-note></p><div class="actions"><button class="action secondary" data-pause>Пауза на час</button><button class="action" data-resume>Возобновить</button></div></div>
       <div class="metrics"><div class="metric sun"><span>Солнце · среднее 5 мин</span><strong data-pv>—</strong><small> Вт</small></div><div class="metric"><span>Фоновая нагрузка</span><strong data-baseline>—</strong><small> Вт</small></div><div class="metric sun"><span>Солнце покрывает фон</span><strong data-coverage>—</strong><small> %</small></div><div class="metric battery"><span>Остаток АКБ по энергии</span><strong data-energy>—</strong><small> %</small></div></div>
       <div class="box"><h3>Условия переключения</h3><div class="fields">${FIELDS.map(([key,label,unit,min,max,step,hint])=>`<div class="field"><label for="field-${key}">${esc(label)}</label><div class="input-row"><input id="field-${key}" data-field="${key}" type="number" min="${min}" max="${max}" step="${step}" inputmode="decimal"><span>${unit}</span></div><p class="hint">${esc(hint)}</p></div>`).join('')}</div><div class="switch-row early"><div><h3>Ранний старт в ясный день</h3><p>От 120 Вт, АКБ ≥50% и прогноз на ближайшие 2 часа покрывает фон.</p></div><button class="toggle" data-early aria-pressed="false">Выкл.</button></div><div class="actions"><button class="action" data-save>Сохранить условия</button></div><p class="notification" data-feedback role="status"></p></div>
-      <div class="box"><h3>Уведомления на телефон</h3><p class="notification-info">Home Assistant сообщит о пропадании и восстановлении сети, а также о подтверждённых автоматических переходах SBU/SUB.</p><div class="phone-row"><select data-phone aria-label="Телефон для уведомлений"></select><button class="action" data-phone-save>Сохранить</button></div><p class="notification-info" data-phone-status></p><div class="switch-row notify-option"><div><h3>Сеть пропала / появилась</h3><p>С подтверждением устойчивого изменения, без реакции на потерю связи.</p></div><button class="toggle" data-notify-grid aria-pressed="false">Выкл.</button></div><div class="switch-row notify-option"><div><h3>Автоматика SBU / SUB</h3><p>После подтверждения режима. При сбое переключения тоже придёт сообщение.</p></div><button class="toggle" data-notify-modes aria-pressed="false">Выкл.</button></div><p class="notification-info">Для доставки нужны работающие Home Assistant, интернет и разрешённые уведомления Companion App.</p></div>
-      <div class="box details"><details><summary>Как выбирается режим</summary><p><b>SBU:</b> ясно или переменная облачность, солнце достигло порога либо покрыло нужную долю фона. Условие держится 5 минут. АКБ сглаживает короткие пики дома.</p><p><b>SUB:</b> ночь, резерв АКБ 25% или напряжение приблизилось к нижнему порогу. Пасмурная погода, слабое солнце или потеря данных возвращают SUB после 10 минут. Между обычными переключениями — минимум 10 минут.</p><p>Фон — нижняя четверть показаний дома за 30 минут, ограниченная диапазоном 400–700 Вт. Короткий пик чайника не становится новым фоном. Погода — модель для Одессы, запрос раз в 5 минут. SBU не включается по устаревшей погоде.</p><p>Ручной выбор режима в этой панели ставит автоматику на паузу на час. Внешние изменения с LCD или из других карточек не распознаются как пауза: сначала выключите автоматику здесь. При неподтверждённой команде автоматические записи останавливаются до «Возобновить».</p><p>При отключённой автоматике текущий режим сохраняется. Автоматика меняет только SBU/SUB. Напряжения, токи заряда и частота не меняются.</p></details></div><p class="result" data-result></p>
+      <div class="box"><h3>История работы автоматики</h3><p class="hint">Фактический режим инвертора и условия на одной шкале времени. Полосы включают ручные переключения; «Авто» показывает, была ли включена автоматика. Наведите или коснитесь графика для значений.</p><energetika-history-card data-auto-history></energetika-history-card></div><div class="box"><h3>Уведомления на телефон</h3><p class="notification-info">Home Assistant сообщит о пропадании и восстановлении сети, а также о подтверждённых автоматических переходах SBU/SUB.</p><div class="phone-row"><select data-phone aria-label="Телефон для уведомлений"></select><button class="action" data-phone-save>Сохранить</button></div><p class="notification-info" data-phone-status></p><div class="switch-row notify-option"><div><h3>Сеть пропала / появилась</h3><p>С подтверждением устойчивого изменения, без реакции на потерю связи.</p></div><button class="toggle" data-notify-grid aria-pressed="false">Выкл.</button></div><div class="switch-row notify-option"><div><h3>Автоматика SBU / SUB</h3><p>После подтверждения режима. При сбое переключения тоже придёт сообщение.</p></div><button class="toggle" data-notify-modes aria-pressed="false">Выкл.</button></div><p class="notification-info">Для доставки нужны работающие Home Assistant, интернет и разрешённые уведомления Companion App.</p></div>
+      <div class="box details"><details><summary>Как выбирается режим</summary><p><b>SBU:</b> ясно или переменная облачность, солнце достигло порога либо покрыло нужную долю фона. Условие держится 5 минут. АКБ сглаживает короткие пики дома.</p><p><b>SUB:</b> ночь, резерв АКБ 25% или напряжение приблизилось к нижнему порогу. Пасмурная погода, слабое солнце или потеря данных возвращают SUB после 10 минут. Порог возврата по покрытию на 15 п.п. ниже входа (при 50% — ниже 35%); слабая мощность сравнивается с этим же фоном, максимум 200 Вт. Между обычными переключениями — минимум 10 минут.</p><p>Фон — нижняя четверть показаний дома за 30 минут, ограниченная диапазоном 400–700 Вт. Короткий пик чайника не становится новым фоном. Погода — модель для Одессы, запрос раз в 5 минут. SBU не включается по устаревшей погоде.</p><p>Ручной выбор режима в этой панели ставит автоматику на паузу на час. Внешние изменения с LCD или из других карточек не распознаются как пауза: сначала выключите автоматику здесь. При неподтверждённой команде автоматические записи останавливаются до «Возобновить».</p><p>При отключённой автоматике текущий режим сохраняется. Автоматика меняет только SBU/SUB. Напряжения, токи заряда и частота не меняются.</p></details></div><p class="result" data-result></p>
     </section>
     </div></dialog>`;
     const r=this.shadowRoot,dialog=r.querySelector('dialog');
+    this._history=r.querySelector('[data-auto-history]');
+    this._history.setConfig({title:'Режимы и потоки энергии',entities:[
+      {entity:'sensor.energetika_pv_average',name:'PV · 5 мин',color:'#ffd65a',maximum:5400},
+      {entity:'sensor.anenji_4200_protocol_1_load_power',name:'Дом',color:'#bc7bff',maximum:8400},
+      {entity:'sensor.anenji_4200_protocol_1_grid_power',name:'Сеть',color:'#38bfff',minimum:-11000,maximum:11000},
+      {entity:'sensor.zariadka_akb',name:'Заряд АКБ',color:'#17e6b3',maximum:8400},
+      {entity:'sensor.razriadka_akb',name:'Разряд АКБ',color:'#ff9259',maximum:8400},
+      {entity:'input_number.energetika_solar_start_watts',name:'Порог PV',color:'#aebccb',dash:true,maximum:1500}
+    ],tracks:[
+      {entity:MODE,name:'Режим инвертора',kind:'mode'},
+      {entity:AUTO,name:'Автоматика',kind:'boolean',onLabel:'Авто',offLabel:'Выкл.'},
+      {entity:'binary_sensor.energetika_solar_ready',name:'Вход разрешён · 5 мин',kind:'boolean',onLabel:'Да',offLabel:'Нет'},
+      {entity:'binary_sensor.energetika_solar_critical',name:'Ночь / защита АКБ',kind:'boolean',onLabel:'SUB',offLabel:'Нет',onColor:'#b65560'},
+      {entity:'sensor.energetika_solar_coverage',name:'Покрытие фона',color:'#ffd65a',unit:'%',maximum:10000,thresholds:[
+        {entity:'input_number.energetika_solar_coverage_target',name:'Вход SBU',color:'#17e6b3'},
+        {entity:'sensor.energetika_solar_exit_coverage',name:'Выход SUB',color:'#ff9259'}]},
+      {entity:'sensor.energetika_battery_percent_energy',name:'Остаток АКБ',color:'#17e6b3',unit:'%',maximum:100,thresholds:[
+        {entity:'input_number.energetika_solar_entry_reserve',name:'Вход SBU',color:'#ffd65a'},
+        {value:25,name:'Резерв SUB',color:'#ff9259'}]}
+    ]});
     r.querySelector('[data-open]').onclick=()=>this.open();
     r.querySelector('.close').onclick=()=>dialog.close();
     dialog.addEventListener('close',()=>{r.querySelector('[data-open]').focus();});

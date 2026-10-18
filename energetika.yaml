@@ -521,6 +521,12 @@ template:
         unit_of_measurement: "%"
         availability: "{{ has_value('sensor.energetika_pv_average') }}"
         state: "{{ (states('sensor.energetika_pv_average') | float(0) / states('sensor.energetika_home_baseline') | float(550) * 100) | round(0) }}"
+      - name: Energetika Solar Exit Coverage
+        unique_id: energetika_solar_exit_coverage
+        default_entity_id: sensor.energetika_solar_exit_coverage
+        unit_of_measurement: "%"
+        availability: "{{ has_value('input_number.energetika_solar_coverage_target') }}"
+        state: "{{ states('input_number.energetika_solar_coverage_target') | float(50) - 15 }}"
       - name: Energetika Solar Strategy
         unique_id: energetika_solar_strategy
         default_entity_id: sensor.energetika_solar_strategy
@@ -592,7 +598,7 @@ template:
              and c.get('cloud_cover', 100) | float(100) <= 85
              and soc >= states('input_number.energetika_solar_entry_reserve') | float(35)
              and (pv >= states('input_number.energetika_solar_start_watts') | float(600)
-               or (pv >= 150 and pv >= base * states('input_number.energetika_solar_coverage_target') | float(85) / 100)
+               or (pv >= 150 and pv >= base * states('input_number.energetika_solar_coverage_target') | float(50) / 100)
                or (is_state('input_boolean.energetika_solar_early_start', 'on') and pv >= 120
                    and soc >= 50 and c.get('weather_code', 99) in [0, 1]
                    and c.get('cloud_cover', 100) | float(100) <= 30
@@ -604,13 +610,15 @@ template:
         default_entity_id: binary_sensor.energetika_solar_weak
         state: >-
           {% set c = state_attr('sensor.energetika_solar_weather', 'current') or {} %}
+          {% set exit_coverage = states('input_number.energetika_solar_coverage_target') | float(50) - 15 %}
+          {% set exit_watts = [200, states('sensor.energetika_home_baseline') | float(550) * exit_coverage / 100] | min %}
           {{ not is_state('binary_sensor.energetika_solar_data_fresh', 'on')
              or not is_state('binary_sensor.energetika_weather_fresh', 'on')
              or c.get('weather_code', 99) not in [0, 1, 2]
              or c.get('cloud_cover', 100) | float(100) >= 90
              or (not is_state('binary_sensor.energetika_solar_ready', 'on')
-                 and (states('sensor.energetika_pv_average') | float(0) < 200
-                   or states('sensor.energetika_solar_coverage') | float(0) < 55)) }}
+                 and (states('sensor.energetika_pv_average') | float(0) < exit_watts
+                   or states('sensor.energetika_solar_coverage') | float(0) < exit_coverage)) }}
         delay_on:
           minutes: 10
 
@@ -689,7 +697,7 @@ input_number:
     mode: box
   energetika_solar_coverage_target:
     name: "Энергетика · Покрытие фоновой нагрузки"
-    min: 70
+    min: 50
     max: 100
     step: 5
     unit_of_measurement: "%"
@@ -894,7 +902,7 @@ automation:
         target:
           entity_id: input_number.energetika_solar_coverage_target
         data:
-          value: 85
+          value: 50
       - action: input_number.set_value
         target:
           entity_id: input_number.energetika_solar_entry_reserve
