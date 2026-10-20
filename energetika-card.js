@@ -1,7 +1,7 @@
-import './energetika-history.js?v=2.16.1';
+import './energetika-history.js?v=2.17.1';
 import './energetika-settings.js?v=2.15.0';
-import './energetika-automation.js?v=2.16.1';
-import './energetika-data.js?v=2.13.0.1';
+import './energetika-automation.js?v=2.17.1';
+import './energetika-data.js?v=2.17.1';
 import './energetika-alerts.js?v=2.8.0';
 
 export function formatRuntime(minutes) {

@@ -1,0 +1,10 @@
+{
+  "domain": "energetika_control",
+  "name": "Energetika · Power control",
+  "version": "2.17.1",
+  "documentation": "https://github.com/Termenafter20012/ha-energetika-anenji",
+  "codeowners": [],
+  "dependencies": ["sensor"],
+  "iot_class": "local_polling",
+  "requirements": []
+}

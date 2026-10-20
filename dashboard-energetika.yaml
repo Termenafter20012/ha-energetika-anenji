@@ -53,6 +53,7 @@ views:
         maximum: 8400
         minimum: 0
     - type: custom:energetika-history-card
+      battery_modes: true
       title: Уровень заряда аккумулятора · 24 часа
       unit: '%'
       date_selector: false
@@ -114,6 +115,7 @@ views:
         maximum: 8400
         minimum: 0
     - type: custom:energetika-history-card
+      battery_modes: true
       title: Уровень заряда аккумулятора
       unit: '%'
       date_selector: true

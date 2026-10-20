@@ -60,10 +60,32 @@ class EnergetikaHistoryCard extends HTMLElement {
   constructor(){super();this.attachShadow({mode:'open'});this._series=[];this._hidden=new Set();this._range='24';this._request=0;this._pointers=new Map();}
   setConfig(config){
     if(!Array.isArray(config.entities)||!config.entities.length)throw new Error('energetika-history-card: entities required');
-    this.config=config;
+    this._baseConfig={...config};
+    this.config={...config};
     this._anchor=config.date_selector?dayStart(dayKey(Date.now())):null;
     this._entities=config.entities.map(item=>typeof item==='string'?{entity:item,name:item}:item);
+    this._batteryHistory=config.battery_modes===true || (config.battery_modes!==false &&
+      /Уровень заряда аккумулятора/i.test(config.title||'') && this._entities.length===1 &&
+      this._entities[0].entity==='sensor.anenji_4200_protocol_1_battery_percent');
+    if(this._batteryHistory){
+      try{this._batteryHistoryMode=localStorage.getItem('energetika.battery-history-mode')==='voltage'?'voltage':'energy';}catch{this._batteryHistoryMode='energy';}
+      this._applyBatteryHistoryMode();
+    }
     this._render();
+  }
+  _applyBatteryHistoryMode(){
+    const energy=this._batteryHistoryMode!=='voltage';
+    this.config={...this._baseConfig,unit:energy?'Вт·ч':'%',y_min:0,y_max:energy?2560:100};
+    this._entities=[{entity:energy?(this.config.battery_energy_entity||'sensor.energetika_battery_remaining'):
+      (this.config.battery_voltage_percent_entity||'sensor.energetika_battery_percent_voltage'),
+      name:energy?'Остаток · счётчик энергии':'Заряд · оценка по напряжению',color:'#17e6b3',minimum:0,maximum:energy?2560:100}];
+  }
+  _selectBatteryHistoryMode(mode){
+    if(!this._batteryHistory||this._batteryHistoryMode===mode)return;
+    this._batteryHistoryMode=mode;
+    try{localStorage.setItem('energetika.battery-history-mode',mode);}catch{}
+    this._request++;this._lastFetch=0;this._series=[];this._tracks=[];this._hidden.clear();this._view=null;this._pointers.clear();
+    this._applyBatteryHistoryMode();this._render();this._load();
   }
   set hass(value){this._hass=value;if(this.isConnected&&(!this._lastFetch||Date.now()-this._lastFetch>60000))this._load();}
   getCardSize(){return 6;}
@@ -97,7 +119,9 @@ class EnergetikaHistoryCard extends HTMLElement {
       @media(max-width:600px){ha-card{padding:14px 10px;border-radius:20px}h2{font-size:15px}.eyebrow{font-size:8px;margin-bottom:5px}.controls{gap:4px}.controls button,input{font-size:10px;padding:6px 8px}.chart svg{height:280px}.legend{gap:4px;margin-top:3px}.legend button{padding:7px 3px;gap:4px 3px;grid-template-columns:5px 1fr;border-radius:8px}.swatch{width:5px;height:5px}.legend .name{font-size:9px}.legend strong{font-size:12px;grid-column:1/-1;text-align:center}.unit{font-size:8px}.footer{font-size:9px;flex-wrap:wrap}.zoom-label{font-size:9px}.gesture-hint{flex:1;white-space:nowrap}}
       @media(max-width:360px){.legend .name{font-size:8px}.legend strong{font-size:11px}.legend button{gap:3px 2px}.chart svg{height:265px}}
       .history-tracks{margin-top:12px}.history-track{margin:12px 0}.track-title{font-size:11px;color:#a6c6d6;line-height:1.6}.track-title .key{white-space:nowrap;display:inline-block;margin-right:8px;font-size:10px}.history-track svg{width:100%;display:block;height:66px;touch-action:pan-y}.history-track.state svg{height:42px}.track-readout{font-size:11px;color:#d7e8f4;line-height:1.8;background:#102739;border:1px solid #2f5268;border-radius:9px;padding:9px}.track-threshold{fill:none;stroke-width:1.2;stroke-dasharray:5 4}.track-axis{font-size:9px;fill:#88a8be}.track-line{fill:none;stroke-width:1.7;vector-effect:non-scaling-stroke}
-    </style><ha-card><header><div><div class="eyebrow">ЭНЕРГЕТИКА / ИСТОРИЯ</div><h2>${escapeHtml(this.config.title||'История энергии')}</h2></div><div class="controls"><button data-range="6">6 ч</button><button data-range="12">12 ч</button><button data-range="24" class="selected">24 ч</button><button data-step="-1" aria-label="Предыдущий период">‹</button><energetika-date-picker></energetika-date-picker><button data-step="1" aria-label="Следующий период">›</button><button data-now hidden title="К текущему времени">Сейчас</button><button data-refresh title="Обновить историю">↻</button></div></header><p class="period" data-period></p><div class="status" role="status"></div><div class="chart"><svg role="img" tabindex="0" aria-label="${escapeHtml(this.config.title||'График')}. Два пальца — масштаб, один — сдвиг. Клавиши плюс, минус, стрелки, Home."></svg><div class="tooltip"></div></div><div class="history-tracks"></div><p class="track-readout" role="status" hidden></p><div class="legend" style="--series-count:${this._entities.length}"></div><div class="footer"><span class="gesture-hint">Два пальца — масштаб · один — сдвиг</span><div class="zoom"><button data-zoom="in" aria-label="Увеличить график">+</button><button data-zoom="out" aria-label="Уменьшить график">−</button><button class="fit" data-fit title="Показать весь выбранный период">Весь период</button><span class="zoom-label"></span></div></div></ha-card>`;
+      .battery-source{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.battery-source button{padding:9px 13px;border:1px solid #31566b;background:#0c2231;border-radius:10px;font-size:13px}.battery-source button[aria-pressed=true]{background:#16483f;border-color:#2db798;color:#a4ffe3}.battery-source-note{font-size:12px;color:#92b6c6;margin:9px 0;line-height:1.6}
+    </style><ha-card><header><div><div class="eyebrow">ЭНЕРГЕТИКА / ИСТОРИЯ</div><h2>${escapeHtml(this.config.title||'История энергии')}</h2></div><div class="controls"><button data-range="6">6 ч</button><button data-range="12">12 ч</button><button data-range="24" class="selected">24 ч</button><button data-step="-1" aria-label="Предыдущий период">‹</button><energetika-date-picker></energetika-date-picker><button data-step="1" aria-label="Следующий период">›</button><button data-now hidden title="К текущему времени">Сейчас</button><button data-refresh title="Обновить историю">↻</button></div></header>${this._batteryHistory?`<div class="battery-source" role="group" aria-label="Источник уровня заряда АКБ"><button data-battery-history="energy" aria-pressed="${this._batteryHistoryMode==='energy'}">По энергии · Вт·ч</button><button data-battery-history="voltage" aria-pressed="${this._batteryHistoryMode==='voltage'}">По напряжению · %</button></div><p class="battery-source-note">${this._batteryHistoryMode==='energy'?'Ваш счётчик: заряд минус разряд по мощности и времени. Полная ёмкость — 2560 Вт·ч.':'Отдельная линейная оценка по напряжению: нижний порог инвертора → 29 В. Зависит от нагрузки; это не счётчик энергии.'}</p>`:''}<p class="period" data-period></p><div class="status" role="status"></div><div class="chart"><svg role="img" tabindex="0" aria-label="${escapeHtml(this.config.title||'График')}. Два пальца — масштаб, один — сдвиг. Клавиши плюс, минус, стрелки, Home."></svg><div class="tooltip"></div></div><div class="history-tracks"></div><p class="track-readout" role="status" hidden></p><div class="legend" style="--series-count:${this._entities.length}"></div><div class="footer"><span class="gesture-hint">Два пальца — масштаб · один — сдвиг</span><div class="zoom"><button data-zoom="in" aria-label="Увеличить график">+</button><button data-zoom="out" aria-label="Уменьшить график">−</button><button class="fit" data-fit title="Показать весь выбранный период">Весь период</button><span class="zoom-label"></span></div></div></ha-card>`;
+    this.shadowRoot.querySelectorAll('[data-battery-history]').forEach(button=>button.onclick=()=>this._selectBatteryHistoryMode(button.dataset.batteryHistory));
     this.shadowRoot.querySelectorAll('[data-range]').forEach(button=>button.addEventListener('click',()=>{this._range=button.dataset.range;this._view=null;this._request++;this._load();}));
     this.shadowRoot.querySelectorAll('[data-step]').forEach(button=>button.onclick=()=>this._navigate(Number(button.dataset.step)));
     this.shadowRoot.querySelector('energetika-date-picker').addEventListener('change',event=>{this._anchor=dayStart(event.detail.value);this._view=null;this._request++;this._load();});
