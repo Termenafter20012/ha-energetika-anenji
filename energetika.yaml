@@ -532,13 +532,20 @@ template:
         default_entity_id: sensor.energetika_solar_strategy
         icon: mdi:weather-partly-cloudy
         state: >-
-          {% if is_state('binary_sensor.energetika_solar_critical', 'on')
+          {% if is_state('binary_sensor.energetika_morning_sbu_window', 'on') %}
+            {% if is_state('binary_sensor.energetika_battery_reserve_critical', 'off')
+                and is_state('binary_sensor.energetika_solar_data_fresh', 'on') %}SBU{% else %}SUB{% endif %}
+          {% elif is_state('binary_sensor.energetika_solar_critical', 'on')
               or is_state('binary_sensor.energetika_solar_weak', 'on') %}SUB
           {% elif is_state('binary_sensor.energetika_solar_ready', 'on') %}SBU
           {% else %}HOLD{% endif %}
         attributes:
           reason: >-
-            {% if is_state('sun.sun', 'below_horizon') %}Ночь — питание SUB, АКБ в резерве.
+            {% if is_state('binary_sensor.energetika_morning_sbu_window', 'on') %}
+              {% if is_state('binary_sensor.energetika_battery_reserve_critical', 'on') %}Утренний SBU прерван: достигнут резерв АКБ или нижнее напряжение — SUB.
+              {% elif not is_state('binary_sensor.energetika_solar_data_fresh', 'on') %}Утренний SBU прерван: нет свежих данных АКБ — SUB.
+              {% else %}Разовый утренний SBU до {{ states('input_datetime.energetika_morning_sbu_end')[11:16] }}. Погода и мощность солнца не ограничивают это окно; защита АКБ действует.{% endif %}
+            {% elif is_state('sun.sun', 'below_horizon') %}Ночь — питание SUB, АКБ в резерве.
             {% elif is_state('binary_sensor.energetika_solar_critical', 'on') %}Достигнут резерв АКБ или нижний порог напряжения — SUB.
             {% elif not is_state('binary_sensor.energetika_solar_data_fresh', 'on') %}Нет свежей телеметрии. Новый SBU запрещён; через 10 минут — SUB.
             {% elif not is_state('binary_sensor.energetika_weather_fresh', 'on') %}Погода недоступна или устарела. Новый SBU запрещён; через 10 минут — SUB.
@@ -571,17 +578,31 @@ template:
           {{ ns.valid and is_state('binary_sensor.anenji_4200_protocol_1_battery_connected', 'on')
              and has_value('sensor.energetika_pv_average')
              and has_value('sensor.energetika_battery_percent_energy') }}
-      - name: Energetika Solar Critical
-        unique_id: energetika_solar_critical
-        default_entity_id: binary_sensor.energetika_solar_critical
+      - name: Energetika Morning SBU Window
+        unique_id: energetika_morning_sbu_window
+        default_entity_id: binary_sensor.energetika_morning_sbu_window
         state: >-
-          {{ is_state('sun.sun', 'below_horizon')
-             or (has_value('sensor.energetika_battery_percent_energy')
+          {% set start = state_attr('input_datetime.energetika_morning_sbu_start', 'timestamp') | float(0) %}
+          {% set end = state_attr('input_datetime.energetika_morning_sbu_end', 'timestamp') | float(0) %}
+          {{ is_state('input_boolean.energetika_morning_sbu_active', 'on')
+             and 0 < start <= as_timestamp(now()) < end }}
+      - name: Energetika Battery Reserve Critical
+        unique_id: energetika_battery_reserve_critical
+        default_entity_id: binary_sensor.energetika_battery_reserve_critical
+        state: >-
+          {{ (has_value('sensor.energetika_battery_percent_energy')
                  and states('sensor.energetika_battery_percent_energy') | float(100) <= 25)
              or (has_value('sensor.anenji_4200_protocol_1_battery_voltage')
                  and has_value('sensor.anenji_4200_protocol_1_battery_under_voltage_off_grid')
                  and states('sensor.anenji_4200_protocol_1_battery_voltage') | float(99)
                     <= states('sensor.anenji_4200_protocol_1_battery_under_voltage_off_grid') | float(0) + 0.2) }}
+      - name: Energetika Solar Critical
+        unique_id: energetika_solar_critical
+        default_entity_id: binary_sensor.energetika_solar_critical
+        state: >-
+          {{ is_state('binary_sensor.energetika_battery_reserve_critical', 'on')
+             or (is_state('sun.sun', 'below_horizon')
+                 and not is_state('binary_sensor.energetika_morning_sbu_window', 'on')) }}
       - name: Energetika Solar Ready
         unique_id: energetika_solar_ready
         default_entity_id: binary_sensor.energetika_solar_ready
@@ -667,6 +688,12 @@ sensor:
     precision: 0
 
 input_boolean:
+  energetika_morning_sbu_armed:
+    name: "Энергетика · Утренний SBU запланирован"
+    icon: mdi:calendar-clock
+  energetika_morning_sbu_active:
+    name: "Энергетика · Утренний SBU выполняется"
+    icon: mdi:weather-sunset-up
   energetika_notify_grid:
     name: "Энергетика · Уведомления о сети"
     icon: mdi:transmission-tower
@@ -718,6 +745,14 @@ input_number:
     mode: box
 
 input_datetime:
+  energetika_morning_sbu_start:
+    name: "Энергетика · Начало утреннего SBU"
+    has_date: true
+    has_time: true
+  energetika_morning_sbu_end:
+    name: "Энергетика · Возврат к погодной автоматике"
+    has_date: true
+    has_time: true
   energetika_solar_pause_until:
     name: "Энергетика · Пауза автоматики до"
     has_date: true
@@ -728,6 +763,9 @@ input_datetime:
     has_time: true
 
 input_text:
+  energetika_morning_sbu_result:
+    name: "Энергетика · Результат утреннего SBU"
+    max: 255
   energetika_notification_target:
     name: "Энергетика · Телефон для уведомлений"
     max: 128
@@ -743,6 +781,73 @@ input_select:
     icon: mdi:transmission-tower
 
 script:
+  energetika_morning_sbu_plan:
+    alias: "Энергетика · Запланировать SBU на завтра"
+    mode: single
+    fields:
+      start_time:
+        required: true
+        selector:
+          time:
+      end_time:
+        required: true
+        selector:
+          time:
+    sequence:
+      - if: >-
+          {{ start_time is not string or end_time is not string
+             or not (start_time | regex_match('^([01][0-9]|2[0-3]):[0-5][0-9](:00)?$'))
+             or not (end_time | regex_match('^([01][0-9]|2[0-3]):[0-5][0-9](:00)?$'))
+             or not (start_time[:5] < end_time[:5] <= '12:00') }}
+        then:
+          - stop: "Выберите время начала раньше окончания. Утреннее окно заканчивается не позднее 12:00."
+            error: true
+      - if: "{{ is_state('input_boolean.energetika_morning_sbu_active', 'on') }}"
+        then:
+          - stop: "Сначала завершите текущее утреннее окно."
+            error: true
+      - if: "{{ is_state('input_boolean.energetika_solar_fault', 'on') }}"
+        then:
+          - stop: "Сначала проверьте инвертор и снимите ошибку переключения кнопкой возобновления."
+            error: true
+      - variables:
+          planned_start: "{{ as_timestamp(today_at(start_time[:5]) + timedelta(days=1)) }}"
+          planned_end: "{{ as_timestamp(today_at(end_time[:5]) + timedelta(days=1)) }}"
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.energetika_morning_sbu_armed
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.energetika_morning_sbu_start
+        data:
+          timestamp: "{{ planned_start }}"
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.energetika_morning_sbu_end
+        data:
+          timestamp: "{{ planned_end }}"
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.energetika_morning_sbu_result
+        data:
+          value: "Завтра {{ (planned_start | float | timestamp_custom('%d.%m %H:%M', true)) }} — SBU до {{ end_time[:5] }}."
+      - action: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.energetika_morning_sbu_armed
+  energetika_morning_sbu_cancel:
+    alias: "Энергетика · Отменить утренний SBU"
+    mode: single
+    sequence:
+      - action: input_boolean.turn_off
+        target:
+          entity_id:
+            - input_boolean.energetika_morning_sbu_armed
+            - input_boolean.energetika_morning_sbu_active
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.energetika_morning_sbu_result
+        data:
+          value: "Утренний запуск отменён. При включённом авто дальше действует погодная логика."
   energetika_phone_notify:
     alias: "Энергетика · Уведомление на выбранный телефон"
     mode: queued
@@ -800,6 +905,11 @@ script:
           entity_id: input_datetime.energetika_solar_pause_until
         data:
           timestamp: "{{ as_timestamp(now()) + 3600 }}"
+      - if: >-
+          {{ is_state('input_boolean.energetika_morning_sbu_armed', 'on')
+             or is_state('input_boolean.energetika_morning_sbu_active', 'on') }}
+        then:
+          - action: script.energetika_morning_sbu_cancel
   energetika_solar_resume:
     alias: "Энергетика · Возобновить автоматику"
     mode: single
@@ -918,9 +1028,140 @@ automation:
           entity_id:
             - input_boolean.energetika_solar_early_start
             - input_boolean.energetika_solar_configured
+  - id: energetika_morning_sbu_manager
+    alias: "Энергетика · Разовый утренний SBU"
+    description: "Сохраняемый запуск на завтра; команды инвертору выполняет общий контроллер SBU/SUB."
+    mode: single
+    max_exceeded: silent
+    triggers:
+      - trigger: time
+        at: input_datetime.energetika_morning_sbu_start
+        id: start
+      - trigger: time
+        at: input_datetime.energetika_morning_sbu_end
+        id: end
+      - trigger: time_pattern
+        seconds: "/30"
+        id: tick
+      - trigger: homeassistant
+        event: start
+        id: boot
+      - trigger: state
+        entity_id: input_boolean.energetika_solar_auto
+        from: "on"
+        to: "off"
+        id: owner_stop
+      - trigger: state
+        entity_id:
+          - binary_sensor.energetika_battery_reserve_critical
+          - binary_sensor.energetika_solar_data_fresh
+          - input_boolean.energetika_solar_fault
+        id: protection
+    actions:
+      - variables:
+          epoch: "{{ as_timestamp(now()) }}"
+          start_at: "{{ state_attr('input_datetime.energetika_morning_sbu_start', 'timestamp') | float(0) }}"
+          end_at: "{{ state_attr('input_datetime.energetika_morning_sbu_end', 'timestamp') | float(0) }}"
+          controller_ids: >-
+            {{ states.automation | selectattr('attributes.id', 'defined')
+               | selectattr('attributes.id', 'eq', 'energetika_solar_mode_control')
+               | map(attribute='entity_id') | list }}
+      - choose:
+          - conditions: >-
+              {{ trigger is defined and trigger.id == 'owner_stop'
+                 and (is_state('input_boolean.energetika_morning_sbu_active', 'on')
+                      or is_state('input_boolean.energetika_morning_sbu_armed', 'on')) }}
+            sequence:
+              - action: script.energetika_morning_sbu_cancel
+          - conditions: "{{ is_state('input_boolean.energetika_morning_sbu_active', 'on') }}"
+            sequence:
+              - variables:
+                  finish_reason: >-
+                    {% if not (0 < start_at | float <= epoch | float < end_at | float) %}Утреннее окно завершено; далее действует обычная погодная автоматика.
+                    {% elif not is_state('input_boolean.energetika_solar_auto', 'on') %}Автоматика выключена. Утреннее окно завершено; текущий режим сохраняется.
+                    {% elif is_state('binary_sensor.energetika_battery_reserve_critical', 'on') %}Утренний SBU завершён: достигнут резерв 25% или нижний порог напряжения АКБ.
+                    {% elif is_state('input_boolean.energetika_solar_fault', 'on') %}Утренний SBU остановлен: смена режима не подтверждена. Проверьте инвертор.
+                    {% elif not is_state('binary_sensor.energetika_solar_data_fresh', 'on') and is_state('select.anenji_4200_protocol_1_output_source_priority', 'Solar-Utility-Battery (SUB)') %}Утренний SBU завершён: нет свежих данных АКБ, подтверждён SUB.
+                    {% endif %}
+              - if: "{{ finish_reason | trim != '' }}"
+                then:
+                  - action: input_boolean.turn_off
+                    target:
+                      entity_id: input_boolean.energetika_morning_sbu_active
+                  - action: input_text.set_value
+                    target:
+                      entity_id: input_text.energetika_morning_sbu_result
+                    data:
+                      value: "{{ finish_reason | trim }}"
+          - conditions: >-
+              {{ is_state('input_boolean.energetika_morning_sbu_armed', 'on')
+                 and (epoch | float >= start_at | float or end_at | float <= start_at | float) }}
+            sequence:
+              - variables:
+                  wait_for_data: >-
+                    {{ 0 < start_at | float <= epoch | float < end_at | float
+                       and epoch | float - start_at | float <= 900
+                       and not is_state('input_boolean.energetika_solar_fault', 'on')
+                       and states('input_datetime.energetika_solar_pause_until') | as_timestamp(0) <= epoch | float
+                       and (not is_state('binary_sensor.energetika_solar_data_fresh', 'on')
+                            or not has_value('sensor.anenji_4200_protocol_1_battery_under_voltage_off_grid')
+                            or not has_value('select.anenji_4200_protocol_1_output_source_priority')
+                            or not has_value('sensor.anenji_4200_protocol_1_control_mode')) }}
+                  skip_reason: >-
+                    {% set e = 'select.anenji_4200_protocol_1_output_source_priority' %}
+                    {% if not (0 < start_at | float < end_at | float) %}Некорректная дата запуска. Выберите время заново.
+                    {% elif epoch | float >= end_at | float or epoch | float - start_at | float > 900 %}Время запуска пропущено более чем на 15 минут. Позднее переключение отменено.
+                    {% elif is_state('input_boolean.energetika_solar_fault', 'on') %}Есть неподтверждённая смена режима. Сначала проверьте инвертор.
+                    {% elif states('input_datetime.energetika_solar_pause_until') | as_timestamp(0) > epoch | float %}Действует ручная пауза.
+                    {% elif not is_state('binary_sensor.energetika_solar_data_fresh', 'on') or not has_value('sensor.anenji_4200_protocol_1_battery_under_voltage_off_grid') or not is_state('binary_sensor.energetika_battery_reserve_critical', 'off') %}Нет свежих безопасных данных АКБ либо достигнут нижний предел.
+                    {% elif states('sensor.energetika_battery_percent_energy') | float(0) < states('input_number.energetika_solar_entry_reserve') | float(35) %}Заряд АКБ ниже настроенного порога входа {{ states('input_number.energetika_solar_entry_reserve') }}%.
+                    {% elif not has_value(e) or states('sensor.anenji_4200_protocol_1_control_mode') != 'full' or state_attr(e, 'editable') == false or state_attr(e, 'policy_editable') == false or state_attr(e, 'blocked_by_inverter') %}Нет связи или разрешения на смену режима инвертора.
+                    {% elif 'Solar-Battery-Utility (SBU)' not in (state_attr(e, 'options') or []) %}SBU недоступен в текущем списке режимов.
+                    {% elif controller_ids | count == 0 %}Не найден общий контроллер SBU/SUB.
+                    {% endif %}
+              - if: "{{ wait_for_data }}"
+                then:
+                  - action: input_text.set_value
+                    target:
+                      entity_id: input_text.energetika_morning_sbu_result
+                    data:
+                      value: "Время запуска наступило. Ожидаются данные инвертора; запуск возможен не позднее {{ (start_at | float + 900) | timestamp_custom('%H:%M', true) }}."
+                else:
+                  - action: input_boolean.turn_off
+                    target:
+                      entity_id: input_boolean.energetika_morning_sbu_armed
+                  - if: "{{ skip_reason | trim != '' }}"
+                    then:
+                      - action: input_text.set_value
+                        target:
+                          entity_id: input_text.energetika_morning_sbu_result
+                        data:
+                          value: "Запуск пропущен: {{ skip_reason | trim }}"
+                      - if: "{{ is_state('input_boolean.energetika_notify_modes', 'on') }}"
+                        then:
+                          - action: script.energetika_phone_notify
+                            continue_on_error: true
+                            data:
+                              title: "Энергетика · Утренний SBU не запущен"
+                              message: "{{ skip_reason | trim }}"
+                    else:
+                      - action: input_boolean.turn_on
+                        target:
+                          entity_id: input_boolean.energetika_morning_sbu_active
+                      - action: input_boolean.turn_on
+                        target:
+                          entity_id: input_boolean.energetika_solar_auto
+                      - action: automation.turn_on
+                        target:
+                          entity_id: "{{ controller_ids }}"
+                      - action: input_text.set_value
+                        target:
+                          entity_id: input_text.energetika_morning_sbu_result
+                        data:
+                          value: "Утреннее окно открыто до {{ states('input_datetime.energetika_morning_sbu_end')[11:16] }}. Режим и подтверждение — в блоке управления выше."
   - id: energetika_solar_mode_control
     alias: "Энергетика · Погода и солнечный SBU/SUB"
-    description: "Выбор режима по погоде, сглаженной PV, фоновой нагрузке и резерву АКБ."
+    description: "Единый исполнитель SBU/SUB: утреннее окно, погода и защита резерва АКБ."
     mode: single
     max_exceeded: silent
     triggers:
@@ -932,6 +1173,8 @@ automation:
           - input_boolean.energetika_solar_auto
           - input_boolean.energetika_solar_fault
           - input_datetime.energetika_solar_pause_until
+          - input_boolean.energetika_morning_sbu_active
+          - binary_sensor.energetika_morning_sbu_window
     conditions:
       - condition: state
         entity_id: input_boolean.energetika_solar_auto
@@ -953,13 +1196,27 @@ automation:
       - condition: template
         value_template: >-
           {{ is_state('binary_sensor.energetika_solar_critical', 'on')
+             or (is_state('binary_sensor.energetika_morning_sbu_window', 'on')
+                 and (is_state('sensor.energetika_solar_strategy', 'SUB')
+                     or states('input_datetime.energetika_solar_last_switch') | as_timestamp(0)
+                        < state_attr('input_datetime.energetika_morning_sbu_start', 'timestamp') | float(0)))
              or as_timestamp(now()) - states('input_datetime.energetika_solar_last_switch') | as_timestamp(0) >= 600 }}
     actions:
       - variables:
-          target_mode: "{{ 'Solar-Battery-Utility (SBU)' if is_state('sensor.energetika_solar_strategy', 'SBU') else 'Solar-Utility-Battery (SUB)' }}"
-          target_code: "{{ states('sensor.energetika_solar_strategy') }}"
+          morning_now: >-
+            {{ is_state('input_boolean.energetika_morning_sbu_active', 'on')
+               and 0 < state_attr('input_datetime.energetika_morning_sbu_start', 'timestamp') | float(0)
+                   <= as_timestamp(now()) < state_attr('input_datetime.energetika_morning_sbu_end', 'timestamp') | float(0) }}
+          target_code: >-
+            {% if morning_now %}
+              {{ 'SBU' if is_state('binary_sensor.energetika_battery_reserve_critical', 'off')
+                   and is_state('binary_sensor.energetika_solar_data_fresh', 'on') else 'SUB' }}
+            {% else %}{{ states('sensor.energetika_solar_strategy') }}{% endif %}
+          target_mode: "{{ 'Solar-Battery-Utility (SBU)' if target_code == 'SBU' else 'Solar-Utility-Battery (SUB)' }}"
           previous_mode: "{{ states('select.anenji_4200_protocol_1_output_source_priority').split('(')[-1].replace(')', '') }}"
-          decision_reason: "{{ state_attr('sensor.energetika_solar_strategy', 'reason') }}"
+          decision_reason: >-
+            {% if morning_now and target_code == 'SBU' %}Разовый утренний запуск до {{ states('input_datetime.energetika_morning_sbu_end')[11:16] }}; защита АКБ действует.
+            {% else %}{{ state_attr('sensor.energetika_solar_strategy', 'reason') }}{% endif %}
       - condition: template
         value_template: >-
           {{ target_mode in (state_attr('select.anenji_4200_protocol_1_output_source_priority', 'options') or [])
@@ -992,6 +1249,17 @@ automation:
               entity_id: input_text.energetika_solar_result
             data:
               value: "{{ now().strftime('%d.%m %H:%M') }} · Инвертор подтвердил {{ target_code }}."
+          - if: >-
+              {{ target_code == 'SUB' and is_state('input_boolean.energetika_morning_sbu_active', 'on') }}
+            then:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.energetika_morning_sbu_active
+              - action: input_text.set_value
+                target:
+                  entity_id: input_text.energetika_morning_sbu_result
+                data:
+                  value: "Утренний SBU завершён защитой: {{ decision_reason }}"
           - if: "{{ is_state('input_boolean.energetika_notify_modes', 'on') }}"
             then:
               - action: script.energetika_phone_notify

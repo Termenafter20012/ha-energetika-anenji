@@ -1,6 +1,6 @@
 import './energetika-history.js?v=2.14.0.1';
 import './energetika-settings.js?v=2.15.0';
-import './energetika-automation.js?v=2.14.0.2';
+import './energetika-automation.js?v=2.16.0';
 import './energetika-data.js?v=2.13.0.1';
 import './energetika-alerts.js?v=2.8.0';
 
@@ -9,7 +9,7 @@ export function formatRuntime(minutes) {
   const total=Math.floor(minutes);
   return total===0?'0 мин':`${Math.floor(total/60)} ч ${String(total%60).padStart(2,'0')} мин`;
 }
-/* Energetika 2.15.0 — local Home Assistant card, no external dependencies. */
+/* Energetika 2.16.0 — local Home Assistant card, no external dependencies. */
 const ROOT = 'sensor.anenji_4200_protocol_1_';
 const SOURCE_MODES = [
   {code:'UTI', option:'Utility First (UTI)', description:'Сеть в приоритете'},
