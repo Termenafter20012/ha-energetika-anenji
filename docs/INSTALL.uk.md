@@ -35,7 +35,7 @@ homeassistant:
 
 Не створюйте другу секцію `homeassistant`. Якщо пакети вже підключені каталогом, скористайтеся наявною схемою.
 
-Скопіюйте **десять** файлів `energetika-card.js`, `energetika-history.js`, `energetika-date.js`, `energetika-settings.js`, `energetika-manual.js`, `energetika-automation.js`, `energetika-data.js`, `energetika-alerts.js`, `energetika-hourly.js` та `energetika-dtek.js` до `www`. Створіть у `www` також копію `energetika-card.js` з назвою `energetika-card-2.16.0.js` для головного ресурсу. Головна картка імпортує історію та налаштування відносними шляхами. У Налаштування → Інформаційні панелі → Ресурси додайте `/local/energetika-card-2.16.0.js`, тип **Модуль JavaScript**. Додаткові ресурси для імпортованих модулів не потрібні.
+Скопіюйте **десять** файлів `energetika-card.js`, `energetika-history.js`, `energetika-date.js`, `energetika-settings.js`, `energetika-manual.js`, `energetika-automation.js`, `energetika-data.js`, `energetika-alerts.js`, `energetika-hourly.js` та `energetika-dtek.js` до `www`. Створіть у `www` також копію `energetika-card.js` з назвою `energetika-card-2.16.1.js` для головного ресурсу. Головна картка імпортує історію та налаштування відносними шляхами. У Налаштування → Інформаційні панелі → Ресурси додайте `/local/energetika-card-2.16.1.js`, тип **Модуль JavaScript**. Додаткові ресурси для імпортованих модулів не потрібні.
 
 При першому створенні `www` може знадобитися перезапуск. Перевірте конфігурацію через інструменти YAML перед перезапуском.
 
@@ -352,6 +352,12 @@ SBU задає пріоритет джерел інвертора: коли со
 ### Оновлення
 
 Оновіть `energetika.yaml`, `energetika-automation.js`, `energetika-card.js` і копію `www/energetika-card-2.16.0.js`, зберігши власні зміни конфігурації. Перезавантажте по черзі `input_boolean.reload`, `input_datetime.reload`, `input_text.reload`, `script.reload`, `template.reload`, `automation.reload` через інструментарій Home Assistant. Змініть головний ресурс на `/local/energetika-card-2.16.0.js` і оновіть екран застосунку. Повний перезапуск не потрібен. Встановлення файлів і перезавантаження компонентів не створюють активного ранкового розкладу.
+
+## Шкала напруги АКБ · 2.16.1
+
+Графік «Напряжение АКБ» має сталу вісь **24–30 В** із поділками через **1 В**. Межі однакові для всіх періодів, календаря та масштабування часу. Показання поза межами осі зберігаються в історії й підказках; обрізається лише лінія за краями області графіка. Інші графіки зберігають автоматичний масштаб.
+
+Для оновлення з 2.16.0 замініть у `www` файли `energetika-card.js`, `energetika-history.js`, `energetika-automation.js`, створіть копію `energetika-card-2.16.1.js` і змініть головний ресурс на `/local/energetika-card-2.16.1.js`. Оновіть екран застосунку. YAML і перезапуск Home Assistant для цього оновлення не потрібні. [Приклад графіка](screenshots/battery-voltage-24-30.jpg).
 
 Серверні об’єкти: `input_boolean.energetika_morning_sbu_armed`, `input_boolean.energetika_morning_sbu_active`, дати `input_datetime.energetika_morning_sbu_start` і `input_datetime.energetika_morning_sbu_end`, текст `input_text.energetika_morning_sbu_result`; сценарії `script.energetika_morning_sbu_plan` і `script.energetika_morning_sbu_cancel`; менеджер з id `energetika_morning_sbu_manager`. Пріоритет надає `binary_sensor.energetika_morning_sbu_window`, захист АКБ відділено у `binary_sensor.energetika_battery_reserve_critical`. Запис у `select` лишається в єдиному `energetika_solar_mode_control`.
 

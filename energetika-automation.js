@@ -1,4 +1,4 @@
-import './energetika-history.js?v=2.14.0.1';
+import './energetika-history.js?v=2.16.1';
 /* Home Assistant owns all deadlines and switching. The UI only displays their countdown. */
 const P='sensor.anenji_4200_protocol_1_';
 const AUTO='input_boolean.energetika_solar_auto';

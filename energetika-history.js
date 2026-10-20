@@ -1,5 +1,5 @@
 import {dayKey,dayStart,dateLabel} from './energetika-date.js?v=2.13.0';
-/* Energetika history 2.13 — recorder, calendar, fixed-hour navigation and touch zoom. */
+/* Energetika history 2.16.1 — recorder, calendar, touch zoom and optional fixed voltage axis. */
 const escapeHtml = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt = (n,d=0)=>Number(n).toLocaleString('ru-RU',{maximumFractionDigits:d});
 const clock = time=>new Date(time).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'});
@@ -183,12 +183,16 @@ class EnergetikaHistoryCard extends HTMLElement {
     const active=this._series.filter(s=>!this._hidden.has(s.entity));
     const values=active.flatMap(s=>visiblePoints(s.points,start,end).filter(p=>p.v!==null).map(p=>p.v));
     let minimum=Math.min(0,...values),maximum=Math.max(1,...values);
-    if(this.config.unit==='%'){minimum=0;maximum=100;}
+    const fixedScale=Number.isFinite(this.config.y_min)&&Number.isFinite(this.config.y_max)&&this.config.y_max>this.config.y_min;
+    if(fixedScale){minimum=this.config.y_min;maximum=this.config.y_max;}
+    else if(this.config.unit==='%'){minimum=0;maximum=100;}
     else{const step=10**Math.floor(Math.log10(Math.max(1,maximum-minimum)));maximum=Math.ceil(maximum/step)*step;minimum=Math.floor(minimum/step)*step;}
     const y=value=>bottom-(value-minimum)/(maximum-minimum)*(bottom-top);
-    let markup='';
-    for(let index=0;index<5;index++){
-      const value=minimum+(maximum-minimum)*index/4;
+    const requestedIntervals=(maximum-minimum)/this.config.y_step;
+    const intervals=fixedScale&&Number.isInteger(requestedIntervals)&&requestedIntervals>=1&&requestedIntervals<=20?requestedIntervals:4;
+    let markup=fixedScale?`<defs><clipPath id="history-plot"><rect x="${left}" y="${top}" width="${right-left}" height="${bottom-top}"/></clipPath></defs>`:'';
+    for(let index=0;index<=intervals;index++){
+      const value=minimum+(maximum-minimum)*index/intervals;
       markup+=`<line class="gridline" x1="${left}" x2="${right}" y1="${y(value)}" y2="${y(value)}"/><text class="axis" x="${left-7}" y="${y(value)+4}" text-anchor="end">${fmt(value,value<10?1:0)}</text>`;
     }
     const ticks=width<500?4:6;
@@ -197,7 +201,10 @@ class EnergetikaHistoryCard extends HTMLElement {
       markup+=`<line class="gridline" x1="${x}" x2="${x}" y1="${top}" y2="${bottom}"/><text class="axis" x="${x}" y="${height-7}" text-anchor="${index===0?'start':index===ticks?'end':'middle'}">${clock(time)}</text>`;
     }
     markup+=`<text class="axis" x="${left}" y="14">${escapeHtml(this.config.unit||'Вт')}</text>`;
+    // Crop the drawing at fixed axis limits without discarding actual recorder values.
+    if(fixedScale)markup+='<g clip-path="url(#history-plot)">';
     for(const series of active)markup+=`<path class="series-line" stroke="${escapeHtml(series.color)}" ${series.dash?'stroke-dasharray="5 4"':''} d="${buildStepPath(series.points,start,end,minimum,maximum,geometry)}"/>`;
+    if(fixedScale)markup+='</g>';
     if(!values.length)markup+=`<text class="empty" x="${(left+right)/2}" y="${height/2}">Нет данных</text>`;
     markup+=`<line class="cross" y1="${top}" y2="${bottom}" visibility="hidden"/>`;
     svg.innerHTML=markup;

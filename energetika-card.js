@@ -1,6 +1,6 @@
-import './energetika-history.js?v=2.14.0.1';
+import './energetika-history.js?v=2.16.1';
 import './energetika-settings.js?v=2.15.0';
-import './energetika-automation.js?v=2.16.0';
+import './energetika-automation.js?v=2.16.1';
 import './energetika-data.js?v=2.13.0.1';
 import './energetika-alerts.js?v=2.8.0';
 
@@ -9,7 +9,7 @@ export function formatRuntime(minutes) {
   const total=Math.floor(minutes);
   return total===0?'0 мин':`${Math.floor(total/60)} ч ${String(total%60).padStart(2,'0')} мин`;
 }
-/* Energetika 2.16.0 — local Home Assistant card, no external dependencies. */
+/* Energetika 2.16.1 — local Home Assistant card, no external dependencies. */
 const ROOT = 'sensor.anenji_4200_protocol_1_';
 const SOURCE_MODES = [
   {code:'UTI', option:'Utility First (UTI)', description:'Сеть в приоритете'},
@@ -520,6 +520,7 @@ class EnergetikaCard extends HTMLElement {
       if(!definition){this.dispatchEvent(new CustomEvent('hass-more-info',{detail:{entityId:entity},bubbles:true,composed:true}));return;}
       const [name,unit,tone,minimum,maximum]=definition;
       config={title:name,unit,entities:[{entity,name,color:palette[tone],minimum,maximum}]};
+      if(key==='voltage')Object.assign(config,{y_min:24,y_max:30,y_step:1});
     }
     this.shadowRoot.querySelector('energetika-history-dialog').open(this._hass,config,opener);
   }
